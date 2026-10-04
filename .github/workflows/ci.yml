@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DJANGO_SETTINGS_MODULE: config.settings.dev
+  DJANGO_SECRET_KEY: ci-only-insecure-secret-key
+  DJANGO_DEBUG: "False"
+  DATABASE_URL: postgres://uniware:uniware@localhost:5432/uniware
+  APPROVED_EMAIL_DOMAIN: chula.ac.th
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_DB: uniware
+          POSTGRES_USER: uniware
+          POSTGRES_PASSWORD: uniware
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U uniware -d uniware"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      # Coverage gate (--cov-fail-under=85) comes from pyproject.toml
+      - run: uv run pytest
+
+  migrations:
+    # Fails if someone changed a model but forgot to commit the migration
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_DB: uniware
+          POSTGRES_USER: uniware
+          POSTGRES_PASSWORD: uniware
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U uniware -d uniware"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run python manage.py makemigrations --check --dry-run
+      - run: uv run python manage.py migrate --noinput
