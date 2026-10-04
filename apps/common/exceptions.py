@@ -15,7 +15,6 @@ _DEFAULT_CODES = {
 
 
 class DomainError(drf_exceptions.APIException):
-
     status_code = status.HTTP_409_CONFLICT
     default_code = "CONFLICT"
 
