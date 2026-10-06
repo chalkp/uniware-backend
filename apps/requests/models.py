@@ -31,7 +31,7 @@ class BorrowerRequest(models.Model):
 
     pickup_date = models.DateField(help_text="Inclusive: first day of possession")
     due_date = models.DateField(help_text="Exclusive: handover-back day")
-    purpose = models.TextField(blank=True, default="")
+    purpose = models.TextField()
 
     status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.PENDING)
     decision_reason = models.TextField(blank=True, default="")
