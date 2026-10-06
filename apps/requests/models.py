@@ -37,5 +37,13 @@ class BorrowerRequest(models.Model):
     decision_reason = models.TextField(blank=True, default="")
     decided_at = models.DateTimeField(null=True, blank=True)
 
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(due_date__gt=models.F("pickup_date")),
+                name="due_date_after_pickup_date",
+            )
+        ]
+
     def __str__(self):
         return f"Request {self.id} - {self.status}"
