@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "apps.common",
     "apps.accounts",
     "apps.equipment",
+    "apps.request",
 ]
 
 MIDDLEWARE = [
