@@ -40,7 +40,7 @@ class BorrowerRequest(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(due_date__gt=models.F("pickup_date")),
+                condition=models.Q(due_date__gte=models.F("pickup_date")),
                 name="due_date_after_pickup_date",
             )
         ]
