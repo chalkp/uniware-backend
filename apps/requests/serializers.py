@@ -52,7 +52,6 @@ class BorrowerRequestSerializer(serializers.ModelSerializer):
         if equipment:
             if getattr(equipment, "status", None) not in [
                 EquipmentStatus.AVAILABLE,
-                EquipmentStatus.RESERVED,
             ]:
                 raise serializers.ValidationError(
                     {"equipment_id": "This equipment is currently not available for borrowing."}
