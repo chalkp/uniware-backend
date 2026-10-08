@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db import models
 
 
-class BorrowerRequest(models.Model):
+class BorrowRequest(models.Model):
     class StatusChoices(models.TextChoices):
         PENDING = "PENDING", "Pending"
         APPROVED = "APPROVED", "Approved"

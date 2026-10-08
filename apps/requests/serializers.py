@@ -3,12 +3,10 @@ from rest_framework import serializers
 from apps.equipment.models import Equipment, EquipmentStatus
 from apps.equipment.serializers import EquipmentSerializer
 
-from .models import BorrowerRequest
+from .models import BorrowRequest
 
 
-class BorrowerRequestSerializer(serializers.ModelSerializer):
-    """EPIC4-5: Serializer for submitting, viewing, and managing borrower requests."""
-
+class BorrowRequestSerializer(serializers.ModelSerializer):
     equipment = EquipmentSerializer(read_only=True)
     equipment_id = serializers.PrimaryKeyRelatedField(
         source="equipment",
@@ -21,7 +19,7 @@ class BorrowerRequestSerializer(serializers.ModelSerializer):
     purpose = serializers.CharField(required=True, allow_blank=False)
 
     class Meta:
-        model = BorrowerRequest
+        model = BorrowRequest
         fields = [
             "id",
             "borrower",

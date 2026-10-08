@@ -1,10 +1,10 @@
 from django.contrib import admin
 
-from .models import BorrowerRequest
+from .models import BorrowRequest
 
 
-@admin.register(BorrowerRequest)
-class BorrowerRequestAdmin(admin.ModelAdmin):
+@admin.register(BorrowRequest)
+class BorrowRequestAdmin(admin.ModelAdmin):
     list_display = [
         "id",
         "borrower",

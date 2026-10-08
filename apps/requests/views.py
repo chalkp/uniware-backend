@@ -4,8 +4,8 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import BorrowerRequest
-from .serializers import BorrowerRequestSerializer
+from .models import BorrowRequest
+from .serializers import BorrowRequestSerializer
 
 
 @extend_schema_view(
@@ -25,17 +25,17 @@ from .serializers import BorrowerRequestSerializer
         ),
     ),
 )
-class BorrowerRequestViewSet(
+class BorrowRequestViewSet(
     mixins.RetrieveModelMixin,
     mixins.CreateModelMixin,
     viewsets.GenericViewSet,
 ):
-    serializer_class = BorrowerRequestSerializer
+    serializer_class = BorrowRequestSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         return (
-            BorrowerRequest.objects.filter(borrower=self.request.user)
+            BorrowRequest.objects.filter(borrower=self.request.user)
             .select_related(
                 "borrower", "equipment", "equipment__category", "equipment__location", "decided_by"
             )
@@ -45,7 +45,7 @@ class BorrowerRequestViewSet(
     def perform_create(self, serializer):
         serializer.save(
             borrower=self.request.user,
-            status=BorrowerRequest.StatusChoices.PENDING,
+            status=BorrowRequest.StatusChoices.PENDING,
         )
 
     @extend_schema(
