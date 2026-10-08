@@ -8,7 +8,7 @@ from rest_framework.test import APIClient
 
 # Adjust these imports according to your actual app structure
 from apps.equipment.models import Category, Equipment, Location
-from apps.requests.models import BorrowerRequest
+from apps.requests.models import BorrowRequest
 
 User = get_user_model()
 
@@ -52,13 +52,13 @@ def checked_out_equipment(db, available_equipment):
 
 
 @pytest.mark.django_db
-class TestBorrowerRequestModel:
+class TestBorrowRequestModel:
     def test_create_borrow_request_model(self, borrower, available_equipment):
         """Test the data model creation, relationships, and default status."""
         pickup = date.today()
         due = pickup + timedelta(days=3)
 
-        request = BorrowerRequest.objects.create(
+        request = BorrowRequest.objects.create(
             borrower=borrower,
             equipment=available_equipment,
             pickup_date=pickup,
@@ -70,16 +70,16 @@ class TestBorrowerRequestModel:
         assert request.borrower == borrower
         assert request.equipment == available_equipment
         # Status should default to PENDING
-        assert request.status == BorrowerRequest.StatusChoices.PENDING
+        assert request.status == BorrowRequest.StatusChoices.PENDING
         assert request.decision_reason == ""
         assert str(request) == f"Request {request.id} - PENDING"
 
 
 @pytest.mark.django_db
-class TestBorrowerRequestAPI:
+class TestBorrowRequestAPI:
     def get_url(self):
-        # Uses the router basename 'borrower-request'
-        return reverse("borrower-request-list")
+        # Uses the router basename 'borrow-request'
+        return reverse("borrow-request-list")
 
     def test_create_request_success(self, api_client, borrower, available_equipment):
         """Test POST API successfully creates a request with valid data."""
@@ -99,8 +99,8 @@ class TestBorrowerRequestAPI:
         assert response.data["borrower"] == borrower.id  # Automatically associated
 
         # Verify in DB
-        assert BorrowerRequest.objects.count() == 1
-        req = BorrowerRequest.objects.first()
+        assert BorrowRequest.objects.count() == 1
+        req = BorrowRequest.objects.first()
         assert req.purpose == "Senior project presentation"
 
     def test_create_request_unauthenticated(self, api_client, available_equipment):
@@ -182,7 +182,7 @@ class TestBorrowerRequestAPI:
         other_user.is_borrower = True
         other_user.save()
 
-        req1 = BorrowerRequest.objects.create(
+        req1 = BorrowRequest.objects.create(
             borrower=borrower,
             equipment=available_equipment,
             pickup_date=date.today(),
@@ -190,7 +190,7 @@ class TestBorrowerRequestAPI:
             purpose="My first request",
         )
 
-        req2 = BorrowerRequest.objects.create(
+        req2 = BorrowRequest.objects.create(
             borrower=borrower,
             equipment=available_equipment,
             pickup_date=date.today() + timedelta(days=5),
@@ -198,7 +198,7 @@ class TestBorrowerRequestAPI:
             purpose="My second request",
         )
 
-        BorrowerRequest.objects.create(
+        BorrowRequest.objects.create(
             borrower=other_user,
             equipment=available_equipment,
             pickup_date=date.today(),
@@ -206,7 +206,7 @@ class TestBorrowerRequestAPI:
             purpose="Someone else's request",
         )
 
-        url = reverse("borrower-request-mine")
+        url = reverse("borrow-request-mine")
         response = api_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
@@ -222,6 +222,6 @@ class TestBorrowerRequestAPI:
 
     def test_get_mine_unauthenticated(self, api_client):
         """Test the 'mine' endpoint requires authentication."""
-        url = reverse("borrower-request-mine")
+        url = reverse("borrow-request-mine")
         response = api_client.get(url)
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
