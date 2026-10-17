@@ -2,11 +2,14 @@
 Populate the database
 """
 
+from datetime import date
+
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from apps.accounts.models import User
 from apps.equipment.models import Category, Equipment, EquipmentStatus, Location
+from apps.requests.models import BorrowRequest
 
 CATEGORIES = [
     "Actuators & Motors",
@@ -63,10 +66,7 @@ EQUIPMENT_NAMES = [
 
 
 class Command(BaseCommand):
-    help = (
-        "Idempotent demo data for the current backend scope (accounts + equipment). "
-        "Borrow-request/loan seeding is added once EPIC4 lands."
-    )
+    help = "Idempotent demo data for the current backend scope (accounts + equipment + requests)."
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -81,8 +81,10 @@ class Command(BaseCommand):
         for provider in providers:
             self.stdout.write(self.style.SUCCESS(f"provider: {provider.email}"))
 
+        borrower_users = []
         for email, first, last in BORROWERS:
             borrower = self._get_or_create_user(email, first, last, is_borrower=True)
+            borrower_users.append(borrower)
             self.stdout.write(self.style.SUCCESS(f"borrower: {borrower.email}"))
 
         categories = [Category.objects.get_or_create(name=name)[0] for name in CATEGORIES]
@@ -107,6 +109,57 @@ class Command(BaseCommand):
             )
             action = "created" if created else "already present"
             self.stdout.write(f"equipment: {asset_id} ({name}) — {action}")
+
+        borrower1 = User.objects.get(email="borrower1@chula.ac.th")
+        borrower2 = User.objects.get(email="borrower2@chula.ac.th")
+        borrower3 = User.objects.get(email="borrower3@chula.ac.th")
+
+        gopro = Equipment.objects.get(name="GoPro Hero 12")
+        quest3 = Equipment.objects.get(name="Meta Quest 3 VR Headset")
+        lanta = Equipment.objects.get(name="Lanta Credits")
+
+        req1, cr1 = BorrowRequest.objects.get_or_create(
+            borrower=borrower1,
+            equipment=gopro,
+            defaults={
+                "pickup_date": date(2026, 11, 1),
+                "due_date": date(2026, 11, 7),
+                "purpose": "Field recording for final project",
+            },
+        )
+        self.stdout.write(
+            self.style.SUCCESS(f"borrow request: {req1.id} — {'created' if cr1 else 'already present'}")
+        )
+
+        req2, cr2 = BorrowRequest.objects.get_or_create(
+            borrower=borrower2,
+            equipment=quest3,
+            defaults={
+                "pickup_date": date(2026, 12, 1),
+                "due_date": date(2026, 12, 14),
+                "purpose": "Testing spatial computing apps",
+            },
+        )
+        self.stdout.write(
+            self.style.SUCCESS(f"borrow request: {req2.id} — {'created' if cr2 else 'already present'}")
+        )
+
+        req3, cr3 = BorrowRequest.objects.get_or_create(
+            borrower=borrower3,
+            equipment=lanta,
+            defaults={
+                "pickup_date": date(2033, 3, 13),
+                "due_date": date(2033, 3, 23),
+                "purpose": "HPC Job processing",
+                "status": BorrowRequest.StatusChoices.APPROVED,
+            },
+        )
+        if req3.status != BorrowRequest.StatusChoices.APPROVED:
+            req3.status = BorrowRequest.StatusChoices.APPROVED
+            req3.save(update_fields=["status"])
+        self.stdout.write(
+            self.style.SUCCESS(f"borrow request: {req3.id} — {'created' if cr3 else 'already present'}")
+        )
 
         self.stdout.write(self.style.SUCCESS("Seed complete."))
 
