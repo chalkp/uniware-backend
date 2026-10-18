@@ -3,8 +3,13 @@ from rest_framework.permissions import IsAuthenticated
 
 from apps.common.permissions import IsProvider
 
-from .models import Category, Equipment, Location
-from .serializers import CategorySerializer, EquipmentSerializer, LocationSerializer
+from .models import Category, Equipment, EquipmentStatus, Location
+from .serializers import (
+    CategorySerializer,
+    EquipmentCatalogFilterSerializer,
+    EquipmentSerializer,
+    LocationSerializer,
+)
 
 
 class EquipmentViewSet(
@@ -27,7 +32,20 @@ class EquipmentViewSet(
         base = Equipment.objects.select_related("category", "location", "provider")
         if self.action in ("update", "partial_update"):
             return base.filter(provider=self.request.user)
-        return base.visible_to_borrowers()
+        queryset = base.visible_to_borrowers()
+        if self.action == "list":
+            filters = EquipmentCatalogFilterSerializer(data=self.request.query_params)
+            filters.is_valid(raise_exception=True)
+            values = filters.validated_data
+            if "category" in values:
+                queryset = queryset.filter(category_id=values["category"])
+            if "location" in values:
+                queryset = queryset.filter(location_id=values["location"])
+            if values.get("availability") == "available":
+                queryset = queryset.filter(status=EquipmentStatus.AVAILABLE)
+            elif values.get("availability") == "unavailable":
+                queryset = queryset.exclude(status=EquipmentStatus.AVAILABLE)
+        return queryset
 
     def perform_create(self, serializer):
         serializer.save(provider=self.request.user)

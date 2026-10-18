@@ -41,3 +41,14 @@ make seed
 | `make shell` | Django shell inside the running `api` container |
 | `make migrate` | applies migrations inside the running `api` container |
 | `make makemigrations` | generates new migrations locally via `uv run` |
+
+## Borrower catalog filters
+
+`GET /api/equipment` accepts optional `category` and `location` UUIDs, available
+from `/api/categories` and `/api/locations`, plus `availability=available` or
+`availability=unavailable`. Multiple filters are combined with AND. `available`
+matches `AVAILABLE`; `unavailable` matches the other borrower-visible statuses
+(`RESERVED`, `CHECKED_OUT`, and `MAINTENANCE`). Omit all filter parameters to
+reset to the full borrower-visible catalog. Malformed UUIDs and unsupported
+availability values return HTTP 400; a valid UUID with no matching equipment
+returns an empty result set.
