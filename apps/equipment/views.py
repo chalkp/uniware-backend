@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import generics, mixins, viewsets
 from rest_framework.permissions import IsAuthenticated
 
@@ -27,7 +28,12 @@ class EquipmentViewSet(
         base = Equipment.objects.select_related("category", "location", "provider")
         if self.action in ("update", "partial_update"):
             return base.filter(provider=self.request.user)
-        return base.visible_to_borrowers()
+        queryset = base.visible_to_borrowers()
+        if self.action == "list":
+            search_query = self.request.query_params.get("search", "").strip()
+            if search_query:
+                queryset = queryset.filter(Q(name__icontains=search_query) | Q(model__icontains=search_query))
+        return queryset
 
     def perform_create(self, serializer):
         serializer.save(provider=self.request.user)
