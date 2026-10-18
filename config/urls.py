@@ -11,4 +11,5 @@ urlpatterns = [
     path("api/auth/", include("apps.accounts.urls_auth")),
     path("api/profile", ProfileView.as_view(), name="profile"),
     path("api/", include("apps.equipment.urls")),
+    path("api/requests/", include("apps.requests.urls")),
 ]
