@@ -36,6 +36,31 @@ def test_us3_1_denies_anonymous_browsing(api_client):
     assert response.status_code == 401
 
 
+# US3-2: Equipment Search Tests
+def test_us3_2_search_matches_partial_equipment_name_case_insensitively(auth_client, borrower):
+    matching = EquipmentFactory(name="Nikon Camera")
+    EquipmentFactory(name="Canon Camera")
+    client = auth_client(borrower)
+
+    response = client.get("/api/equipment", {"search": "nikon"})
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.data["results"]] == [str(matching.id)]
+
+
+def test_us3_2_search_matches_model_and_excludes_hidden_equipment(auth_client, borrower):
+    matching = EquipmentFactory(name="Camera", model="Nikon D850")
+    EquipmentFactory(name="Hidden Camera", model="Nikon D850", status=EquipmentStatus.ARCHIVED)
+    EquipmentFactory(name="Disabled Camera", model="Nikon D850", status=EquipmentStatus.DISABLED)
+    client = auth_client(borrower)
+
+    response = client.get("/api/equipment", {"search": "d850"})
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.data["results"]] == [str(matching.id)]
+
+
+# US3-3: Equipment Catalog Filtering Tests
 def test_us3_3_combines_category_and_location_filters_with_and(auth_client, borrower):
     category = CategoryFactory()
     location = LocationFactory()

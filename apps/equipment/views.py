@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import generics, mixins, viewsets
 from rest_framework.permissions import IsAuthenticated
 
@@ -45,6 +46,10 @@ class EquipmentViewSet(
                 queryset = queryset.filter(status=EquipmentStatus.AVAILABLE)
             elif values.get("availability") == "unavailable":
                 queryset = queryset.exclude(status=EquipmentStatus.AVAILABLE)
+
+            search_query = self.request.query_params.get("search", "").strip()
+            if search_query:
+                queryset = queryset.filter(Q(name__icontains=search_query) | Q(model__icontains=search_query))
         return queryset
 
     def perform_create(self, serializer):

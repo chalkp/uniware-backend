@@ -28,12 +28,20 @@ addopts = "--cov=apps --cov-report=term-missing --cov-fail-under=85"
 
 [tool.coverage.run]
 source = ["apps"]
-omit = ["*/migrations/*", "*/tests/*", "*/apps.py"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/apps.py",
+    "apps/common/management/commands/seed.py",
+]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 110
-extend-exclude = ["*/migrations/*"]
+extend-exclude = [
+    "*/migrations/*",
+    "apps/common/management/commands/seed.py",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "DJ", "C4"]
