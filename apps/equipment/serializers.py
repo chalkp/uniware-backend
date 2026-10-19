@@ -3,6 +3,15 @@ from rest_framework import serializers
 from .models import PROVIDER_SETTABLE_STATUSES, Category, Equipment, EquipmentStatus, Location
 
 
+class EquipmentCatalogFilterSerializer(serializers.Serializer):
+    category = serializers.UUIDField(required=False)
+    location = serializers.UUIDField(required=False)
+    availability = serializers.ChoiceField(
+        choices=(("available", "Available"), ("unavailable", "Unavailable")),
+        required=False,
+    )
+
+
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category

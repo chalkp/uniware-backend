@@ -4,8 +4,13 @@ from rest_framework.permissions import IsAuthenticated
 
 from apps.common.permissions import IsProvider
 
-from .models import Category, Equipment, Location
-from .serializers import CategorySerializer, EquipmentSerializer, LocationSerializer
+from .models import Category, Equipment, EquipmentStatus, Location
+from .serializers import (
+    CategorySerializer,
+    EquipmentCatalogFilterSerializer,
+    EquipmentSerializer,
+    LocationSerializer,
+)
 
 
 class EquipmentViewSet(
@@ -30,6 +35,18 @@ class EquipmentViewSet(
             return base.filter(provider=self.request.user)
         queryset = base.visible_to_borrowers()
         if self.action == "list":
+            filters = EquipmentCatalogFilterSerializer(data=self.request.query_params)
+            filters.is_valid(raise_exception=True)
+            values = filters.validated_data
+            if "category" in values:
+                queryset = queryset.filter(category_id=values["category"])
+            if "location" in values:
+                queryset = queryset.filter(location_id=values["location"])
+            if values.get("availability") == "available":
+                queryset = queryset.filter(status=EquipmentStatus.AVAILABLE)
+            elif values.get("availability") == "unavailable":
+                queryset = queryset.exclude(status=EquipmentStatus.AVAILABLE)
+
             search_query = self.request.query_params.get("search", "").strip()
             if search_query:
                 queryset = queryset.filter(Q(name__icontains=search_query) | Q(model__icontains=search_query))
