@@ -1,8 +1,8 @@
-from rest_framework.routers import DefaultRouter
+from rest_framework.routers import SimpleRouter
 
 from .views import ProviderBorrowRequestViewSet
 
-router = DefaultRouter()
+router = SimpleRouter(trailing_slash=False)
 router.register(r"requests", ProviderBorrowRequestViewSet, basename="provider-request")
 
 urlpatterns = router.urls

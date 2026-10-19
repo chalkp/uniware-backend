@@ -1,5 +1,6 @@
 from datetime import date
 
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from apps.equipment.models import Equipment, EquipmentStatus
@@ -7,6 +8,26 @@ from apps.equipment.serializers import EquipmentSerializer
 
 from .models import BorrowRequest
 from .services import check_equipment_availability
+
+User = get_user_model()
+
+
+class BorrowerSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "email", "first_name", "last_name", "department"]
+
+
+class ProviderRequestListFilterSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=tuple((choice.value, choice.label) for choice in BorrowRequest.StatusChoices)
+        + (("ALL", "All"),),
+        required=False,
+    )
+
+
+class RejectionReasonSerializer(serializers.Serializer):
+    reason = serializers.CharField(max_length=2000, allow_blank=False, trim_whitespace=True)
 
 
 class BorrowRequestSerializer(serializers.ModelSerializer):
@@ -96,3 +117,25 @@ class BorrowRequestSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+
+class ProviderBorrowRequestSerializer(serializers.ModelSerializer):
+    borrower = BorrowerSummarySerializer(read_only=True)
+    equipment = EquipmentSerializer(read_only=True)
+    decided_by = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = BorrowRequest
+        fields = [
+            "id",
+            "borrower",
+            "equipment",
+            "pickup_date",
+            "due_date",
+            "purpose",
+            "status",
+            "decision_reason",
+            "decided_by",
+            "decided_at",
+        ]
+        read_only_fields = fields

@@ -1,20 +1,24 @@
+from django.db import transaction
+from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
-from rest_framework import mixins, permissions, status, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.accounts.models import AccountStatus
+from apps.common.exceptions import BookingConflict, InvalidStateTransition
+from apps.common.permissions import IsProvider
+from apps.equipment.models import Equipment, EquipmentStatus
+
 from .models import BorrowRequest
-from .serializers import BorrowRequestSerializer
-
-
-class IsProviderUser(permissions.BasePermission):
-    """Allows access only to users with the is_provider flag set to True."""
-
-    def has_permission(self, request, view):
-        return bool(
-            request.user and request.user.is_authenticated and getattr(request.user, "is_provider", False)
-        )
+from .serializers import (
+    BorrowRequestSerializer,
+    ProviderBorrowRequestSerializer,
+    ProviderRequestListFilterSerializer,
+    RejectionReasonSerializer,
+)
+from .services import check_equipment_availability
 
 
 @extend_schema_view(
@@ -109,38 +113,87 @@ class BorrowRequestViewSet(
         return Response(serializer.data)
 
 
+class IsActiveProvider(IsProvider):
+    message = "This action requires an active provider account."
+
+    def has_permission(self, request, view):
+        return bool(
+            super().has_permission(request, view)
+            and request.user.is_active
+            and request.user.account_status == AccountStatus.ACTIVE
+        )
+
+
 @extend_schema_view(
     list=extend_schema(
-        summary="List Provider's Equipment Requests",
+        summary="List requests for my equipment",
         description="Returns requests made for equipment managed by the authenticated provider.",
-        parameters=[OpenApiParameter("status", type=str, description="Filter by status (e.g., PENDING)")],
+        parameters=[OpenApiParameter("status", type=str, description="Filter by request status")],
     ),
     retrieve=extend_schema(
-        summary="Get Provider Request Detail",
-        description=(
-            "Retrieve a specific request.Returns 404 if the doesn't exist or managed by the provider."
-        ),
+        summary="Get a request for my equipment",
+        description="Returns 404 if the request is not managed by the authenticated provider.",
     ),
 )
 class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
-    """US5-1, US5-2"""
-
-    serializer_class = BorrowRequestSerializer
-    permission_classes = [permissions.IsAuthenticated, IsProviderUser]
+    serializer_class = ProviderBorrowRequestSerializer
+    permission_classes = [IsAuthenticated, IsActiveProvider]
 
     def get_queryset(self):
-        # Strictly scope to equipment owned by the requesting provider
-        queryset = (
-            BorrowRequest.objects.filter(equipment__provider=self.request.user)
-            .select_related(
-                "borrower", "equipment", "equipment__category", "equipment__location", "decided_by"
-            )
-            .order_by("pickup_date")
+        queryset = BorrowRequest.objects.filter(equipment__provider=self.request.user).select_related(
+            "borrower", "equipment", "equipment__category", "equipment__location", "decided_by"
         )
+        if self.action in ("approve", "reject"):
+            queryset = queryset.select_for_update(of=("self",))
+        return queryset.order_by("pickup_date", "id")
 
-        # US5-1: Handle status filtering
-        status_param = self.request.query_params.get("status")
-        if status_param:
-            queryset = queryset.filter(status=status_param.upper())
+    def list(self, request, *args, **kwargs):
+        filters = ProviderRequestListFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        queryset = self.filter_queryset(self.get_queryset())
+        requested_status = filters.validated_data.get("status")
+        if requested_status and requested_status != "ALL":
+            queryset = queryset.filter(status=requested_status)
 
-        return queryset
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            return self.get_paginated_response(self.get_serializer(page, many=True).data)
+        return Response(self.get_serializer(queryset, many=True).data)
+
+    @extend_schema(summary="Approve a pending request for my equipment")
+    @action(detail=True, methods=["post"], url_path="approve")
+    @transaction.atomic
+    def approve(self, request, pk=None):
+        borrow_request = self.get_object()
+        if borrow_request.status != BorrowRequest.StatusChoices.PENDING:
+            raise InvalidStateTransition("Only pending requests can be approved.")
+
+        equipment = Equipment.objects.select_for_update().get(pk=borrow_request.equipment_id)
+        if equipment.status != EquipmentStatus.AVAILABLE or not check_equipment_availability(
+            equipment.id, borrow_request.pickup_date, borrow_request.due_date
+        ):
+            raise BookingConflict("Equipment is no longer available for the requested period.")
+
+        borrow_request.status = BorrowRequest.StatusChoices.APPROVED
+        borrow_request.decision_reason = ""
+        borrow_request.decided_by = request.user
+        borrow_request.decided_at = timezone.now()
+        borrow_request.save(update_fields=["status", "decision_reason", "decided_by", "decided_at"])
+        return Response(self.get_serializer(borrow_request).data)
+
+    @extend_schema(summary="Reject a pending request for my equipment")
+    @action(detail=True, methods=["post"], url_path="reject")
+    @transaction.atomic
+    def reject(self, request, pk=None):
+        borrow_request = self.get_object()
+        if borrow_request.status != BorrowRequest.StatusChoices.PENDING:
+            raise InvalidStateTransition("Only pending requests can be rejected.")
+
+        reason_serializer = RejectionReasonSerializer(data=request.data)
+        reason_serializer.is_valid(raise_exception=True)
+        borrow_request.status = BorrowRequest.StatusChoices.REJECTED
+        borrow_request.decision_reason = reason_serializer.validated_data["reason"]
+        borrow_request.decided_by = request.user
+        borrow_request.decided_at = timezone.now()
+        borrow_request.save(update_fields=["status", "decision_reason", "decided_by", "decided_at"])
+        return Response(self.get_serializer(borrow_request).data)
