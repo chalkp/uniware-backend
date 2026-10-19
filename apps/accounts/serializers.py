@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from django.contrib.auth import password_validation
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
@@ -75,3 +77,39 @@ class RegisterSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = UserSerializer.Meta.fields
+        read_only_fields = tuple(field for field in fields if field not in User.EDITABLE_PROFILE_FIELDS)
+
+    def to_internal_value(self, data):
+        if isinstance(data, Mapping):
+            errors = {
+                field: ["This field may not be updated."]
+                for field in data
+                if field in self.fields and field not in User.EDITABLE_PROFILE_FIELDS
+            }
+            errors.update({field: ["Unknown field."] for field in data if field not in self.fields})
+            if errors:
+                raise serializers.ValidationError(errors)
+        return super().to_internal_value(data)
+
+    def validate_first_name(self, value):
+        return self._validate_name(value)
+
+    def validate_last_name(self, value):
+        return self._validate_name(value)
+
+    @staticmethod
+    def _validate_name(value):
+        try:
+            validate_person_name(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
+        return value.strip()
+
+    def validate_department(self, value):
+        return value.strip()

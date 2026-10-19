@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .exceptions import InvalidCredentials
-from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
+from .serializers import LoginSerializer, ProfileSerializer, RegisterSerializer, UserSerializer
 
 
 class RegisterView(APIView):
@@ -66,3 +66,18 @@ class MeView(APIView):
     @extend_schema(responses={200: UserSerializer})
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+
+class ProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: ProfileSerializer})
+    def get(self, request):
+        return Response(ProfileSerializer(request.user).data)
+
+    @extend_schema(request=ProfileSerializer, responses={200: ProfileSerializer})
+    def patch(self, request):
+        serializer = ProfileSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(ProfileSerializer(serializer.instance).data, status=status.HTTP_200_OK)
