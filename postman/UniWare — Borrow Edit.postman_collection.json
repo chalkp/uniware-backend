@@ -1,0 +1,1836 @@
+﻿{
+    "collection": {
+        "info": {
+            "_postman_id": "338047a1-d807-45bf-a50d-2f074bc379fb",
+            "name": "UniWare — Borrow Edit",
+            "description": "Covers every Sprint 1 endpoint (US1-1..US1-3, US2-1..US2-3, US2-5, US3-1, US3-4) with both the AC-P (happy path) and AC-N (failure) case for each. See docs/POSTMAN_DEBUGGING_GUIDE.md (or the published guide) for how the CSRF/session auto-injection scripts below work and how to read each failure.\n\nRun folders top-to-bottom in order the first time — each folder logs in as whichever persona it needs, so later folders don\u0027t silently depend on state left over from earlier ones, EXCEPT folders 6-10 which reuse {{equipment_id}}/{{category_id}}/{{location_id}} captured by folders 5 and 6.",
+            "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+            "createdAt": "2026-10-18T14:58:16.000Z",
+            "updatedAt": "2026-10-18T14:58:17.000Z",
+            "lastUpdatedBy": "59002862",
+            "uid": "59002862-338047a1-d807-45bf-a50d-2f074bc379fb"
+        },
+        "item": [
+            {
+                "name": "0 — Server Health",
+                "item": [
+                    {
+                        "name": "Schema is reachable",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\u0027status is 200\u0027, function () { pm.response.to.have.status(200); });"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "85538a52-ccae-4b69-8f2a-31c41172897e",
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "{{base_url}}/api/schema/",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "schema",
+                                    ""
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-85538a52-ccae-4b69-8f2a-31c41172897e"
+                    }
+                ],
+                "id": "269ba4b5-0859-4ba2-ada5-4f23328a86fe",
+                "createdAt": "2026-10-18T14:58:17.000Z",
+                "updatedAt": "2026-10-18T14:58:17.000Z",
+                "uid": "59002862-269ba4b5-0859-4ba2-ada5-4f23328a86fe"
+            },
+            {
+                "name": "5 — US2-5 Categories \u0026 Locations",
+                "item": [
+                    {
+                        "name": "Login (setup)",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has(\u0027sessionid\u0027)).to.be.true; });\n"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "4fd587e2-6709-4f10-b2f6-8543345e1327",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"email\": \"{{borrower_email}}\", \"password\": \"{{password}}\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/auth/login",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "auth",
+                                    "login"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-4fd587e2-6709-4f10-b2f6-8543345e1327"
+                    },
+                    {
+                        "name": "List Categories (any authenticated role)",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\u0027status is 200\u0027, function () { pm.response.to.have.status(200); });\npm.test(\u0027is a plain array, not paginated\u0027, function () {\n  pm.expect(pm.response.json()).to.be.an(\u0027array\u0027);\n});\nconst body = pm.response.json();\nif (body.length) { pm.collectionVariables.set(\u0027category_id\u0027, body[0].id); }"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "9fc9056e-41e3-4fc4-a40c-96fd70ab7d62",
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "{{base_url}}/api/categories",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "categories"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-9fc9056e-41e3-4fc4-a40c-96fd70ab7d62"
+                    },
+                    {
+                        "name": "List Locations (any authenticated role)",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\u0027status is 200\u0027, function () { pm.response.to.have.status(200); });\nconst body = pm.response.json();\nif (body.length) { pm.collectionVariables.set(\u0027location_id\u0027, body[0].id); }"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "b17a38f6-6e66-486f-a77d-50feaeba3c3a",
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": "{{base_url}}/api/locations",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "locations"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-b17a38f6-6e66-486f-a77d-50feaeba3c3a"
+                    },
+                    {
+                        "name": "List Equipments",
+                        "id": "91e881b5-f099-4832-8b2d-13d4c1568730",
+                        "request": {
+                            "method": "GET",
+                            "header": [],
+                            "url": {
+                                "raw": ""
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-91e881b5-f099-4832-8b2d-13d4c1568730"
+                    }
+                ],
+                "id": "d5340455-2f0b-4df6-9acc-dcc7fae5e9c0",
+                "description": "Saves the first category/location id into collection variables for the Equipment requests below. Run this folder at least once before folder 6.",
+                "createdAt": "2026-10-18T14:58:17.000Z",
+                "updatedAt": "2026-10-18T14:58:17.000Z",
+                "uid": "59002862-d5340455-2f0b-4df6-9acc-dcc7fae5e9c0"
+            },
+            {
+                "name": "6 — US2-1 Add equipment",
+                "item": [
+                    {
+                        "name": "Login as Provider1 (switch persona)",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has(\u0027sessionid\u0027)).to.be.true; });\n"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "e56f53fe-fcc6-4035-88f5-a6f6c4f0fc80",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"email\": \"{{provider1_email}}\", \"password\": \"{{password}}\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/auth/login",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "auth",
+                                    "login"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-e56f53fe-fcc6-4035-88f5-a6f6c4f0fc80"
+                    },
+                    {
+                        "name": "Create Equipment — Valid (AC-P)",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\u0027status is 201\u0027, function () { pm.response.to.have.status(201); });\npm.test(\u0027provider is server-set to the caller, not client-supplied\u0027, function () {\n  pm.expect(pm.response.json().provider).to.be.a(\u0027string\u0027);\n});\npm.collectionVariables.set(\u0027equipment_id\u0027, pm.response.json().id);\npm.collectionVariables.set(\u0027equipment_asset_id\u0027, pm.response.json().asset_id);"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "a71f28f9-8651-4c90-a514-b3dded67ca04",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"asset_id\": \"POSTMAN-{{$timestamp}}\", \"name\": \"Postman Demo Equipment\", \"category_id\": \"{{category_id}}\", \"location_id\": \"{{location_id}}\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/equipment",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "equipment"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-a71f28f9-8651-4c90-a514-b3dded67ca04"
+                    }
+                ],
+                "id": "3597543e-0941-4fd4-a9e7-e17a25c11c38",
+                "description": "Run folder 5 first so {{category_id}}/{{location_id}} are populated. Leaves an active Provider1 session and a real {{equipment_id}} for folders 7-10.",
+                "createdAt": "2026-10-18T14:58:17.000Z",
+                "updatedAt": "2026-10-18T14:58:17.000Z",
+                "uid": "59002862-3597543e-0941-4fd4-a9e7-e17a25c11c38"
+            },
+            {
+                "name": "11 - US4-1",
+                "item": [
+                    {
+                        "name": "Scope 1: Create br and view br",
+                        "item": [
+                            {
+                                "name": "Login As borrower_1(setup)",
+                                "event": [
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has(\u0027sessionid\u0027)).to.be.true; });\n\nvar jsonData = pm.response.json();\n\nif (jsonData.id) {\n    pm.environment.set(\"borrower1_user_id\", jsonData.id);\n}"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "ec0a2165-7869-42ef-8498-40df85307226",
+                                "request": {
+                                    "method": "POST",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": {
+                                        "mode": "raw",
+                                        "raw": "{\"email\": \"{{borrower_email}}\", \"password\": \"{{password}}\"}",
+                                        "options": {
+                                            "raw": {
+                                                "language": "json"
+                                            }
+                                        }
+                                    },
+                                    "url": {
+                                        "raw": "{{base_url}}/api/auth/login",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "auth",
+                                            "login"
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-ec0a2165-7869-42ef-8498-40df85307226"
+                            },
+                            {
+                                "name": "Create Borrower Request(Valid)",
+                                "event": [
+                                    {
+                                        "listen": "prerequest",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "const moment = require(\u0027moment\u0027);\r\n\r\nconst pickupDate = moment().format(\"YYYY-MM-DD\");\r\n\r\nconst dueDate = moment().add(3, \u0027days\u0027).format(\"YYYY-MM-DD\");\r\n\r\npm.variables.set(\"timestamp1\", pickupDate);\r\npm.variables.set(\"timestamp2\", dueDate);"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "var jsonData = pm.response.json();\r\n\r\nif (jsonData.id) {\r\n    pm.environment.set(\"borrower_request_id\", jsonData.id);\r\n}\r\nTest: pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "fdeedbcd-3d65-4633-afc4-eb7ac5d2a9c9",
+                                "request": {
+                                    "method": "POST",
+                                    "header": [],
+                                    "body": {
+                                        "mode": "raw",
+                                        "raw": "{\"borrower_id\" : \"f069e110-f4b3-40b5-8af5-bd30c26f1da8\",\r\n  \"equipment_id\": \"{{equipment_id}}\",\r\n  \"pickup_date\": \"{{timestamp1}}\",\r\n  \"due_date\": \"{{timestamp2}}\",\r\n  \"purpose\": \"timestamp 1 is \u003c= timestamp2\"\r\n}",
+                                        "options": {
+                                            "raw": {
+                                                "language": "json"
+                                            }
+                                        }
+                                    },
+                                    "url": {
+                                        "raw": "{{base_url}}/api/requests/borrow-requests/",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "requests",
+                                            "borrow-requests",
+                                            ""
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-fdeedbcd-3d65-4633-afc4-eb7ac5d2a9c9"
+                            },
+                            {
+                                "name": "Create invalid Borrower Request(due_date\u003cpickup_date)",
+                                "event": [
+                                    {
+                                        "listen": "prerequest",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "const moment = require(\u0027moment\u0027);\r\n\r\nconst pickupDate = moment().format(\"YYYY-MM-DD\");\r\n\r\nconst dueDate = moment().add(3, \u0027days\u0027).format(\"YYYY-MM-DD\");\r\n\r\npm.variables.set(\"timestamp2\", pickupDate);\r\npm.variables.set(\"timestamp1\", dueDate);"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "Test: pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "98047d47-76c4-461d-aa85-aef5bc2374a7",
+                                "request": {
+                                    "method": "POST",
+                                    "header": [],
+                                    "body": {
+                                        "mode": "raw",
+                                        "raw": "{ \r\n  \"equipment_id\": \"{{equipment_id}}\",\r\n  \"pickup_date\": \"{{timestamp1}}\",\r\n  \"due_date\": \"{{timestamp2}}\",\r\n  \"purpose\": \"timestamp 1 is \u003e timestamp2\"\r\n}",
+                                        "options": {
+                                            "raw": {
+                                                "language": "json"
+                                            }
+                                        }
+                                    },
+                                    "url": {
+                                        "raw": "{{base_url}}/api/requests/borrow-requests/",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "requests",
+                                            "borrow-requests",
+                                            ""
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-98047d47-76c4-461d-aa85-aef5bc2374a7"
+                            },
+                            {
+                                "name": "Create Invalid Borrower Request(Missing fields eq id)",
+                                "event": [
+                                    {
+                                        "listen": "prerequest",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "const moment = require(\u0027moment\u0027);\r\n\r\nconst pickupDate = moment().format(\"YYYY-MM-DD\");\r\n\r\nconst dueDate = moment().add(3, \u0027days\u0027).format(\"YYYY-MM-DD\");\r\n\r\npm.variables.set(\"timestamp1\", pickupDate);\r\npm.variables.set(\"timestamp2\", dueDate);"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "Test: pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "01924aa2-3d50-418e-8ae7-25579ab47ff8",
+                                "request": {
+                                    "method": "POST",
+                                    "header": [],
+                                    "body": {
+                                        "mode": "raw",
+                                        "raw": "{\r\n  \"equipment_id\": \"\",\r\n  \"pickup_date\": \"{{timestamp1}}\",\r\n  \"due_date\": \"{{timestamp2}}\",\r\n  \"purpose\": \"no eid\"\r\n}",
+                                        "options": {
+                                            "raw": {
+                                                "language": "json"
+                                            }
+                                        }
+                                    },
+                                    "url": {
+                                        "raw": "{{base_url}}/api/requests/borrow-requests/",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "requests",
+                                            "borrow-requests",
+                                            ""
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-01924aa2-3d50-418e-8ae7-25579ab47ff8"
+                            },
+                            {
+                                "name": "Create Invalid Borrower Request(Missing fields purpose)",
+                                "event": [
+                                    {
+                                        "listen": "prerequest",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "const moment = require(\u0027moment\u0027);\r\n\r\nconst pickupDate = moment().format(\"YYYY-MM-DD\");\r\n\r\nconst dueDate = moment().add(3, \u0027days\u0027).format(\"YYYY-MM-DD\");\r\n\r\npm.variables.set(\"timestamp1\", pickupDate);\r\npm.variables.set(\"timestamp2\", dueDate);\r\n\r\n"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "Test: pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "4048d3dc-3e63-44d2-864f-3169772f5f91",
+                                "request": {
+                                    "method": "POST",
+                                    "header": [],
+                                    "body": {
+                                        "mode": "raw",
+                                        "raw": "{\r\n  \"equipment_id\": \"{{equipment_id}}\",\r\n  \"pickup_date\": \"{{timestamp1}}\",\r\n  \"due_date\": \"{{timestamp2}}\",\r\n  \"purpose\": \"\"\r\n}",
+                                        "options": {
+                                            "raw": {
+                                                "language": "json"
+                                            }
+                                        }
+                                    },
+                                    "url": {
+                                        "raw": "{{base_url}}/api/requests/borrow-requests/",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "requests",
+                                            "borrow-requests",
+                                            ""
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-4048d3dc-3e63-44d2-864f-3169772f5f91"
+                            },
+                            {
+                                "name": "Get All Borrower Requests Owned by brw1",
+                                "event": [
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "c8961353-e5f0-44ee-8cb3-96a8337f7eea",
+                                "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                        "raw": "{{base_url}}/api/requests/borrow-requests/mine",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "requests",
+                                            "borrow-requests",
+                                            "mine"
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-c8961353-e5f0-44ee-8cb3-96a8337f7eea"
+                            },
+                            {
+                                "name": "Get Borrower Request by id(Valid)",
+                                "event": [
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "fb2cccfc-e0f4-4291-bb7d-e6af8b0a4dca",
+                                "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                        "raw": "{{base_url}}/api/requests/borrow-requests/{{borrower_request_id}}",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "requests",
+                                            "borrow-requests",
+                                            "{{borrower_request_id}}"
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-fb2cccfc-e0f4-4291-bb7d-e6af8b0a4dca"
+                            }
+                        ],
+                        "id": "831efc91-a93a-4806-8f77-3123525f4df0",
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-831efc91-a93a-4806-8f77-3123525f4df0"
+                    },
+                    {
+                        "name": "Scope 2: Test",
+                        "item": [
+                            {
+                                "name": "Login As borrower_2(switch)",
+                                "event": [
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has(\u0027sessionid\u0027)).to.be.true; });\n"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "d5ef64aa-47f5-4d18-98b2-0952b28b6b65",
+                                "request": {
+                                    "method": "POST",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": {
+                                        "mode": "raw",
+                                        "raw": "{\"email\": \"{{borrower2_email}}\", \"password\": \"{{password}}\"}",
+                                        "options": {
+                                            "raw": {
+                                                "language": "json"
+                                            }
+                                        }
+                                    },
+                                    "url": {
+                                        "raw": "{{base_url}}/api/auth/login",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "auth",
+                                            "login"
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-d5ef64aa-47f5-4d18-98b2-0952b28b6b65"
+                            },
+                            {
+                                "name": "Get Invalid Borrower Request by id(not owned that request)",
+                                "event": [
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "Test: pm.test(\"status is 404\", function () { pm.response.to.have.status(404); });"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "27a13bf2-322d-4832-b295-f46744806287",
+                                "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                        "raw": "{{base_url}}/api/requests/borrow-requests/{{borrower_request_id}}",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "requests",
+                                            "borrow-requests",
+                                            "{{borrower_request_id}}"
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-27a13bf2-322d-4832-b295-f46744806287"
+                            },
+                            {
+                                "name": "Get Invalid Borrower Request by id(id not valid inside db)",
+                                "event": [
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "Test: pm.test(\"status is 404\", function () { pm.response.to.have.status(404); });"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "ab76b03a-df8c-4c3a-98ed-61693b9a0f9e",
+                                "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                        "raw": "{{base_url}}/api/requests/borrow-requests/6776This-is-random-id_6776",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "requests",
+                                            "borrow-requests",
+                                            "6776This-is-random-id_6776"
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-ab76b03a-df8c-4c3a-98ed-61693b9a0f9e"
+                            }
+                        ],
+                        "id": "2c6a2212-65aa-40b3-8694-ae9f6a000c44",
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-2c6a2212-65aa-40b3-8694-ae9f6a000c44"
+                    },
+                    {
+                        "name": "Scope 3:",
+                        "item": [
+                            {
+                                "name": "Login As borrower_2(switch)",
+                                "event": [
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has(\u0027sessionid\u0027)).to.be.true; });\n\nvar jsonData = pm.response.json();\n\nif (jsonData.id) {\n    pm.environment.set(\"borrower2_user_id\", jsonData.id);\n}"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "2e12aa5d-7e26-47c1-866c-6c079a36f4ba",
+                                "request": {
+                                    "method": "POST",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": {
+                                        "mode": "raw",
+                                        "raw": "{\"email\": \"{{borrower2_email}}\", \"password\": \"{{password}}\"}",
+                                        "options": {
+                                            "raw": {
+                                                "language": "json"
+                                            }
+                                        }
+                                    },
+                                    "url": {
+                                        "raw": "{{base_url}}/api/auth/login",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "auth",
+                                            "login"
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-2e12aa5d-7e26-47c1-866c-6c079a36f4ba"
+                            },
+                            {
+                                "name": "Get All Borrower Requests Owned by brw2",
+                                "event": [
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "40cb2821-dfc7-462e-9223-96cc82d1b7d0",
+                                "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                        "raw": "{{base_url}}/api/requests/borrow-requests/mine",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "requests",
+                                            "borrow-requests",
+                                            "mine"
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-40cb2821-dfc7-462e-9223-96cc82d1b7d0"
+                            },
+                            {
+                                "name": "Create Borrower Request with other user id",
+                                "event": [
+                                    {
+                                        "listen": "prerequest",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "const moment = require(\u0027moment\u0027);\r\n\r\nconst pickupDate = moment().format(\"YYYY-MM-DD\");\r\n\r\nconst dueDate = moment().add(3, \u0027days\u0027).format(\"YYYY-MM-DD\");\r\n\r\npm.variables.set(\"timestamp1\", pickupDate);\r\npm.variables.set(\"timestamp2\", dueDate);"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "b26f9d8d-1ed5-486a-a70f-182b29d6ec79",
+                                "request": {
+                                    "method": "POST",
+                                    "header": [],
+                                    "body": {
+                                        "mode": "raw",
+                                        "raw": "{\"borrower_id\" : \"{{borrower1_user_id}}\",\r\n  \"equipment_id\": \"{{equipment_id}}\",\r\n  \"pickup_date\": \"{{timestamp1}}\",\r\n  \"due_date\": \"{{timestamp2}}\",\r\n  \"purpose\": \"Create request using other user id\"\r\n}",
+                                        "options": {
+                                            "raw": {
+                                                "language": "json"
+                                            }
+                                        }
+                                    },
+                                    "url": {
+                                        "raw": "{{base_url}}/api/requests/borrow-requests/",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "requests",
+                                            "borrow-requests",
+                                            ""
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-b26f9d8d-1ed5-486a-a70f-182b29d6ec79"
+                            },
+                            {
+                                "name": "Create Borrower Request with his user id",
+                                "event": [
+                                    {
+                                        "listen": "prerequest",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "const moment = require(\u0027moment\u0027);\r\n\r\nconst pickupDate = moment().format(\"YYYY-MM-DD\");\r\n\r\nconst dueDate = moment().add(3, \u0027days\u0027).format(\"YYYY-MM-DD\");\r\n\r\npm.variables.set(\"timestamp1\", pickupDate);\r\npm.variables.set(\"timestamp2\", dueDate);"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "52e5b126-779f-4a6a-9ac4-89c7b38debca",
+                                "request": {
+                                    "method": "POST",
+                                    "header": [],
+                                    "body": {
+                                        "mode": "raw",
+                                        "raw": "{\"borrower_id\" : \"{{borrower2_user_id}}\",\r\n  \"equipment_id\": \"{{equipment_id}}\",\r\n  \"pickup_date\": \"{{timestamp1}}\",\r\n  \"due_date\": \"{{timestamp2}}\",\r\n  \"purpose\": \"Create request using his user id\"\r\n}",
+                                        "options": {
+                                            "raw": {
+                                                "language": "json"
+                                            }
+                                        }
+                                    },
+                                    "url": {
+                                        "raw": "{{base_url}}/api/requests/borrow-requests/",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "requests",
+                                            "borrow-requests",
+                                            ""
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-52e5b126-779f-4a6a-9ac4-89c7b38debca"
+                            },
+                            {
+                                "name": "Get All Borrower Requests Owned by brw2",
+                                "event": [
+                                    {
+                                        "listen": "test",
+                                        "script": {
+                                            "type": "text/javascript",
+                                            "exec": [
+                                                "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });"
+                                            ]
+                                        }
+                                    }
+                                ],
+                                "id": "d49fd503-9bd9-433b-beae-7d20b4382757",
+                                "request": {
+                                    "method": "GET",
+                                    "header": [],
+                                    "url": {
+                                        "raw": "{{base_url}}/api/requests/borrow-requests/mine",
+                                        "host": [
+                                            "{{base_url}}"
+                                        ],
+                                        "path": [
+                                            "api",
+                                            "requests",
+                                            "borrow-requests",
+                                            "mine"
+                                        ]
+                                    }
+                                },
+                                "response": [],
+                                "createdAt": "2026-10-18T14:58:17.000Z",
+                                "updatedAt": "2026-10-18T14:58:17.000Z",
+                                "uid": "59002862-d49fd503-9bd9-433b-beae-7d20b4382757"
+                            }
+                        ],
+                        "id": "03280911-0eb0-4ba8-b343-979d970b7586",
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-03280911-0eb0-4ba8-b343-979d970b7586"
+                    }
+                ],
+                "id": "b37a6862-b438-433f-943b-a805ff72e4eb",
+                "description": "run 5,6 first\n\nscope 1: login as `borrower_1` and try to create request valid and invalid one including get all borrower requests borrower_1 owned and get borrower requests {id}\n\nscope 2: login as `borrower_2` and try to access request that create by `borrower_1` ,try invalid {id}\n\nscope 3: login as `borrower_2` and try to create request using `borrower1` id(we will replace req.body.id with req.param.id then create the request ) and using `borrower2` id",
+                "createdAt": "2026-10-18T14:58:17.000Z",
+                "updatedAt": "2026-10-18T14:58:17.000Z",
+                "uid": "59002862-b37a6862-b438-433f-943b-a805ff72e4eb"
+            },
+            {
+                "name": "14 - US4-4 Edit Requests",
+                "item": [
+                    {
+                        "name": "Edit due_date 67 days prior to pickup_date",
+                        "event": [
+                            {
+                                "listen": "prerequest",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "const moment = require(\u0027moment\u0027);\n\nconst pickupDate = moment().add(5, \u0027days\u0027).format(\"YYYY-MM-DD\");\nconst dueDateInvalid = moment().add(5 - 67, \u0027days\u0027).format(\"YYYY-MM-DD\");\n\npm.variables.set(\"patch_pickup_date\", pickupDate);\npm.variables.set(\"patch_due_date_invalid\", dueDateInvalid);"
+                                    ]
+                                }
+                            },
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "3e268973-aca4-4ad4-85fd-8379fff50a3a",
+                        "request": {
+                            "method": "PATCH",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"pickup_date\": \"{{patch_pickup_date}}\", \"due_date\": \"{{patch_due_date_invalid}}\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/requests/borrow-requests/{{borrower_request_id}}/",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "requests",
+                                    "borrow-requests",
+                                    "{{borrower_request_id}}",
+                                    ""
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-3e268973-aca4-4ad4-85fd-8379fff50a3a"
+                    },
+                    {
+                        "name": "Edit non-existent borrow request",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 404\", function () { pm.response.to.have.status(404); });"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "a0e9769a-4f77-4c0a-8a08-422bf4852ea3",
+                        "request": {
+                            "method": "PATCH",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"purpose\": \"trying to edit a non-existent request\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/requests/borrow-requests/6776This-is-random-id_6776/",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "requests",
+                                    "borrow-requests",
+                                    "6776This-is-random-id_6776",
+                                    ""
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-a0e9769a-4f77-4c0a-8a08-422bf4852ea3"
+                    },
+                    {
+                        "name": "Login As borrower_2 (switch persona)",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has(\u0027sessionid\u0027)).to.be.true; });"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "9afd162e-dfeb-4d4e-a191-73594f08446c",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"email\": \"{{borrower2_email}}\", \"password\": \"{{password}}\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/auth/login",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "auth",
+                                    "login"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-9afd162e-dfeb-4d4e-a191-73594f08446c"
+                    },
+                    {
+                        "name": "Edit request owned by another borrower",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 404\", function () { pm.response.to.have.status(404); });"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "f54aea17-a62b-4254-8cf5-2c03d65a401b",
+                        "request": {
+                            "method": "PATCH",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"purpose\": \"borrower_2 trying to edit borrower_1 request\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/requests/borrow-requests/{{borrower_request_id}}/",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "requests",
+                                    "borrow-requests",
+                                    "{{borrower_request_id}}",
+                                    ""
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-f54aea17-a62b-4254-8cf5-2c03d65a401b"
+                    },
+                    {
+                        "name": "Login As borrower_1 (switch back)",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has(\u0027sessionid\u0027)).to.be.true; });"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "f3fb1001-dceb-4a5c-af62-7259ece7a811",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"email\": \"{{borrower_email}}\", \"password\": \"{{password}}\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/auth/login",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "auth",
+                                    "login"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-f3fb1001-dceb-4a5c-af62-7259ece7a811"
+                    },
+                    {
+                        "name": "Valid edit — due_date +1 day and random equipment",
+                        "event": [
+                            {
+                                "listen": "prerequest",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "const moment = require(\u0027moment\u0027);\n\n// Fetch equipment list and pick a random one\nconst baseUrl = pm.environment.get(\"base_url\") || pm.collectionVariables.get(\"base_url\");\npm.sendRequest({ url: baseUrl + \"/api/equipment\", method: \"GET\" }, function (err, res) {\n    if (!err \u0026\u0026 res.code === 200) {\n        const equipments = res.json().results;\n        if (Array.isArray(equipments) \u0026\u0026 equipments.length \u003e 0) {\n            const randomIndex = Math.floor(Math.random() * equipments.length);\n            pm.variables.set(\"patch_random_equipment_id\", equipments[randomIndex].id);\n        } else {\n            // Fallback to existing equipment_id if list is empty or unexpected shape\n            pm.variables.set(\"patch_random_equipment_id\", pm.collectionVariables.get(\"equipment_id\"));\n        }\n    } else {\n        pm.variables.set(\"patch_random_equipment_id\", pm.collectionVariables.get(\"equipment_id\"));\n    }\n});\n\n// Shift due_date forward by 1 day from the current due_date (or today + 4 days as fallback)\nconst newDueDate = moment().add(4, \u0027days\u0027).format(\"YYYY-MM-DD\");\npm.variables.set(\"patch_valid_due_date\", newDueDate);"
+                                    ]
+                                }
+                            },
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\n\nvar jsonData = pm.response.json();\npm.test(\"due_date is updated\", function () {\n    pm.expect(jsonData.due_date).to.eql(pm.variables.get(\"patch_valid_due_date\"));\n});\npm.test(\"equipment_id is updated\", function () {\n    pm.expect(jsonData.equipment.id).to.eql(pm.variables.get(\"patch_random_equipment_id\"));\n});"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "99a9d99c-218a-4535-9535-812ae31113f8",
+                        "request": {
+                            "method": "PATCH",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"due_date\": \"{{patch_valid_due_date}}\", \"equipment_id\": \"{{patch_random_equipment_id}}\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/requests/borrow-requests/{{borrower_request_id}}/",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "requests",
+                                    "borrow-requests",
+                                    "{{borrower_request_id}}",
+                                    ""
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-99a9d99c-218a-4535-9535-812ae31113f8"
+                    }
+                ],
+                "id": "99033e27-ec81-4f2d-a5ee-2229d341fafe",
+                "description": "Dependencies (in order of execution) :\n\n1. US2-5\n    \n2. US2-1\n    \n3. US4-1\n    \n\nOnce all the dependencies are completed, send every request within this folder in order, this should have the same results as the pytest version",
+                "createdAt": "2026-10-18T14:58:17.000Z",
+                "updatedAt": "2026-10-18T14:58:17.000Z",
+                "uid": "59002862-99033e27-ec81-4f2d-a5ee-2229d341fafe"
+            },
+            {
+                "name": "15 - US4-5 Cancel Request",
+                "item": [
+                    {
+                        "name": "Login as provider1 (setup)",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has(\u0027sessionid\u0027)).to.be.true; });"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "eca82f87-7559-4aab-9ddf-12a87c7ba3d6",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"email\": \"{{provider1_email}}\", \"password\": \"{{password}}\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/auth/login",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "auth",
+                                    "login"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-eca82f87-7559-4aab-9ddf-12a87c7ba3d6"
+                    },
+                    {
+                        "name": "Create dummy equipment for cancel test",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });\n\nvar jsonData = pm.response.json();\nif (jsonData.id) {\n    pm.collectionVariables.set(\"cancel_equipment_id\", jsonData.id);\n}"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "fab94b08-e21b-4ac2-811b-a56b057568c8",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"asset_id\": \"CANCEL-TEST-{{$timestamp}}\", \"name\": \"Cancel Test Equipment\", \"category_id\": \"{{category_id}}\", \"location_id\": \"{{location_id}}\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/equipment",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "equipment"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-fab94b08-e21b-4ac2-811b-a56b057568c8"
+                    },
+                    {
+                        "name": "Login as borrower_1 (setup)",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has(\u0027sessionid\u0027)).to.be.true; });\n\nvar jsonData = pm.response.json();\nif (jsonData.id) {\n    pm.collectionVariables.set(\"borrower1_user_id\", jsonData.id);\n}"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "19149c48-d81b-4ec7-ac7a-b518ed0ca1fa",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"email\": \"{{borrower_email}}\", \"password\": \"{{password}}\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/auth/login",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "auth",
+                                    "login"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-19149c48-d81b-4ec7-ac7a-b518ed0ca1fa"
+                    },
+                    {
+                        "name": "Create borrow request for cancel test",
+                        "event": [
+                            {
+                                "listen": "prerequest",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "const moment = require(\u0027moment\u0027);\n\nconst pickupDate = moment().add(1, \u0027days\u0027).format(\"YYYY-MM-DD\");\nconst dueDate = moment().add(4, \u0027days\u0027).format(\"YYYY-MM-DD\");\n\npm.variables.set(\"cancel_pickup_date\", pickupDate);\npm.variables.set(\"cancel_due_date\", dueDate);"
+                                    ]
+                                }
+                            },
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });\n\nvar jsonData = pm.response.json();\nif (jsonData.id) {\n    pm.collectionVariables.set(\"cancel_request_id\", jsonData.id);\n}"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "d8c65360-8671-47cf-8c5a-27adb1042df3",
+                        "request": {
+                            "method": "POST",
+                            "header": [],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"equipment_id\": \"{{cancel_equipment_id}}\", \"pickup_date\": \"{{cancel_pickup_date}}\", \"due_date\": \"{{cancel_due_date}}\", \"purpose\": \"created for cancel test\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/requests/borrow-requests/",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "requests",
+                                    "borrow-requests",
+                                    ""
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-d8c65360-8671-47cf-8c5a-27adb1042df3"
+                    },
+                    {
+                        "name": "Login as borrower_2 (switch)",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has(\u0027sessionid\u0027)).to.be.true; });"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "b985fd09-4598-4ccd-ab3c-b4df3de049f3",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"email\": \"{{borrower2_email}}\", \"password\": \"{{password}}\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/auth/login",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "auth",
+                                    "login"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-b985fd09-4598-4ccd-ab3c-b4df3de049f3"
+                    },
+                    {
+                        "name": "Cancel request not owned by borrower_2",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 404\", function () { pm.response.to.have.status(404); });"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "62ff8b66-d87e-4a25-879a-e0c2993e880c",
+                        "request": {
+                            "method": "POST",
+                            "header": [],
+                            "url": {
+                                "raw": "{{base_url}}/api/requests/borrow-requests/{{cancel_request_id}}/cancel/",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "requests",
+                                    "borrow-requests",
+                                    "{{cancel_request_id}}",
+                                    "cancel",
+                                    ""
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-62ff8b66-d87e-4a25-879a-e0c2993e880c"
+                    },
+                    {
+                        "name": "Cancel nonexistent borrow request",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 404\", function () { pm.response.to.have.status(404); });"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "8a2fefdb-44b3-465a-b692-75449c6a0be3",
+                        "request": {
+                            "method": "POST",
+                            "header": [],
+                            "url": {
+                                "raw": "{{base_url}}/api/requests/borrow-requests/6776This-is-random-id_6776/cancel/",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "requests",
+                                    "borrow-requests",
+                                    "6776This-is-random-id_6776",
+                                    "cancel",
+                                    ""
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-8a2fefdb-44b3-465a-b692-75449c6a0be3"
+                    },
+                    {
+                        "name": "Login as borrower_1 (switch back)",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has(\u0027sessionid\u0027)).to.be.true; });"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "d68478bd-38a2-4580-b417-90745cdf1004",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\"email\": \"{{borrower_email}}\", \"password\": \"{{password}}\"}",
+                                "options": {
+                                    "raw": {
+                                        "language": "json"
+                                    }
+                                }
+                            },
+                            "url": {
+                                "raw": "{{base_url}}/api/auth/login",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "auth",
+                                    "login"
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-d68478bd-38a2-4580-b417-90745cdf1004"
+                    },
+                    {
+                        "name": "Cancel borrow request (valid)",
+                        "event": [
+                            {
+                                "listen": "test",
+                                "script": {
+                                    "type": "text/javascript",
+                                    "exec": [
+                                        "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\n\nvar jsonData = pm.response.json();\npm.test(\"status update correctly\", function () {\n    pm.expect(jsonData.state).to.eql(\"CANCELLED\");\n    pm.expect(jsonData.equipment.status).to.eql(\"AVAILABLE\");\n});"
+                                    ]
+                                }
+                            }
+                        ],
+                        "id": "86fc1206-1f90-4ac0-a452-b14370e05ecf",
+                        "request": {
+                            "method": "POST",
+                            "header": [],
+                            "url": {
+                                "raw": "{{base_url}}/api/requests/borrow-requests/{{cancel_request_id}}/cancel/",
+                                "host": [
+                                    "{{base_url}}"
+                                ],
+                                "path": [
+                                    "api",
+                                    "requests",
+                                    "borrow-requests",
+                                    "{{cancel_request_id}}",
+                                    "cancel",
+                                    ""
+                                ]
+                            }
+                        },
+                        "response": [],
+                        "createdAt": "2026-10-18T14:58:17.000Z",
+                        "updatedAt": "2026-10-18T14:58:17.000Z",
+                        "uid": "59002862-86fc1206-1f90-4ac0-a452-b14370e05ecf"
+                    }
+                ],
+                "id": "b45d248d-214b-4444-a67b-941c6498e8ad",
+                "description": "Dependencies (in order of execution) :\n\n1. US2-5\n    \n2. US2-1\n    \n3. US4-1\n    \n\n\\- Login as provider1, then create a dummy component specifically for testing cancelling requests.  \n\\- Login as borrower_1 and create a borrowing request  \n\\- Login as borrower_2 and try to cancel that borrowing request, it should return 404. Then cancel a nonexistent borrowing request, it should return 404 as well.  \n\\- Login as borrower_1, then cancel that request which should return 200 and mark the request\u0027s state as CANCELLED.",
+                "createdAt": "2026-10-18T14:58:17.000Z",
+                "updatedAt": "2026-10-18T14:58:17.000Z",
+                "uid": "59002862-b45d248d-214b-4444-a67b-941c6498e8ad"
+            }
+        ],
+        "event": [
+            {
+                "listen": "prerequest",
+                "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                        "// Auto-attach the CSRF header captured from the last login/register\n// response, on every request. Harmless on GETs (server ignores it there).\nconst token = pm.collectionVariables.get(\u0027csrf_token\u0027);\nif (token) {\n    pm.request.headers.upsert({ key: \u0027X-CSRFToken\u0027, value: token });\n}"
+                    ]
+                }
+            },
+            {
+                "listen": "test",
+                "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                        "// After every response, refresh csrf_token from whatever csrftoken cookie\n// is now in the jar (set fresh on every login/register response).\nconst csrfCookie = pm.cookies.get(\u0027csrftoken\u0027);\nif (csrfCookie) {\n    pm.collectionVariables.set(\u0027csrf_token\u0027, csrfCookie);\n}"
+                    ]
+                }
+            }
+        ],
+        "variable": [
+            {
+                "key": "base_url",
+                "value": "http://localhost:8000",
+                "type": "string"
+            },
+            {
+                "key": "password",
+                "value": "Str0ngPassw0rd!",
+                "type": "string"
+            },
+            {
+                "key": "borrower_email",
+                "value": "borrower1@chula.ac.th",
+                "type": "string"
+            },
+            {
+                "key": "provider1_email",
+                "value": "provider1@chula.ac.th",
+                "type": "string"
+            },
+            {
+                "key": "provider2_email",
+                "value": "provider2@chula.ac.th",
+                "type": "string"
+            },
+            {
+                "key": "admin_email",
+                "value": "admin@chula.ac.th",
+                "type": "string"
+            },
+            {
+                "key": "borrower2_email",
+                "value": "borrower2@chula.ac.th",
+                "type": "string"
+            },
+            {
+                "key": "csrf_token",
+                "value": "",
+                "type": "string"
+            },
+            {
+                "key": "category_id",
+                "value": "",
+                "type": "string"
+            },
+            {
+                "key": "location_id",
+                "value": "",
+                "type": "string"
+            },
+            {
+                "key": "equipment_id",
+                "value": "",
+                "type": "string"
+            },
+            {
+                "key": "equipment_asset_id",
+                "value": "",
+                "type": "string"
+            },
+            {
+                "key": "borrower_request_id",
+                "value": "",
+                "type": "string"
+            },
+            {
+                "key": "borrower1_user_id",
+                "value": "",
+                "type": "string"
+            },
+            {
+                "key": "borrower2_user_id",
+                "value": "",
+                "type": "string"
+            },
+            {
+                "key": "cancel_equipment_id",
+                "value": "",
+                "type": "string"
+            },
+            {
+                "key": "cancel_request_id",
+                "value": "",
+                "type": "string"
+            }
+        ]
+    }
+}

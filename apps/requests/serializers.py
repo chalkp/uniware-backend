@@ -46,9 +46,22 @@ class BorrowRequestSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
-        pickup_date = attrs.get("pickup_date")
-        due_date = attrs.get("due_date")
+        """US4-4"""
+        # Ensure edits are only allowed when the request is in PENDING state
+        if self.instance and self.instance.status != BorrowRequest.StatusChoices.PENDING:
+            raise serializers.ValidationError(
+                {"non_field_errors": "Only pending borrow requests can be edited."}
+            )
+
+        if self.instance:
+            pickup_date = attrs.get("pickup_date", self.instance.pickup_date)
+            due_date = attrs.get("due_date", self.instance.due_date)
+        else:
+            pickup_date = attrs.get("pickup_date")
+            due_date = attrs.get("due_date")
         equipment = attrs.get("equipment")
+        if equipment is None and self.instance:
+            equipment = self.instance.equipment
 
         today = date.today()
 
@@ -69,11 +82,17 @@ class BorrowRequestSerializer(serializers.ModelSerializer):
                     {"equipment_id": "This equipment is currently not available for borrowing."}
                 )
 
-        if equipment and pickup_date and due_date:
-            is_available = check_equipment_availability(equipment.id, pickup_date, due_date)
-            if not is_available:
-                raise serializers.ValidationError(
-                    {"non_field_errors": "The equipment is already booked during this date range."}
-                )
+        if (
+            equipment
+            and pickup_date
+            and due_date
+            and (
+                not self.instance or any(field in attrs for field in ("equipment", "pickup_date", "due_date"))
+            )
+            and not check_equipment_availability(equipment.id, pickup_date, due_date)
+        ):
+            raise serializers.ValidationError(
+                {"non_field_errors": "The equipment is already booked during this date range."}
+            )
 
         return attrs

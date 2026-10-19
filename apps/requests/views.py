@@ -1,5 +1,5 @@
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import mixins, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -20,20 +20,28 @@ from .serializers import BorrowRequestSerializer
     retrieve=extend_schema(
         summary="Get borrow request details",
         description=(
-            "Retrieve the full details and current status of a specific borrow request using its ID."
+            "Retrieve the full details and current status of a specific borrow request using its ID. "
             "You can only view your own requests."
         ),
+    ),
+    partial_update=extend_schema(
+        summary="Update a borrow request",
+        description="Update a pending borrow request's dates, equipment, or purpose.",
     ),
 )
 class BorrowRequestViewSet(
     mixins.RetrieveModelMixin,
     mixins.CreateModelMixin,
+    mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
+    """US4-4, US4-5"""
+
     serializer_class = BorrowRequestSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        """US4-4, US4-5"""
         return (
             BorrowRequest.objects.filter(borrower=self.request.user)
             .select_related(
@@ -65,4 +73,28 @@ class BorrowRequestViewSet(
             return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary="Cancel a borrow request",
+        description=(
+            "Transition a pending borrow request status to CANCELLED without deleting the database record"
+        ),
+    )
+    @action(detail=True, methods=["post", "patch"], url_path="cancel")
+    def cancel(self, request, pk=None):
+        """US4-5"""
+        borrow_request = self.get_object()
+
+        if borrow_request.status != BorrowRequest.StatusChoices.PENDING:
+            return Response(
+                {"detail": "Only pending borrow requests can be cancelled."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        borrow_request.status = BorrowRequest.StatusChoices.CANCELLED
+        borrow_request.save(update_fields=["status"])
+
+        serializer = self.get_serializer(borrow_request)
+
         return Response(serializer.data)
