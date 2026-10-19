@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "81c33658-85a7-4aca-8eef-1e205416b935",
+    "_postman_id": "ae7a160c-7491-4f94-b247-6a4480c965a4",
     "name": "UniWare — Copy",
     "description": "Covers every Sprint 1 endpoint (US1-1..US1-3, US2-1..US2-3, US2-5, US3-1, US3-4) with both the AC-P (happy path) and AC-N (failure) case for each. See docs/POSTMAN_DEBUGGING_GUIDE.md (or the published guide) for how the CSRF/session auto-injection scripts below work and how to read each failure.\n\nRun folders top-to-bottom in order the first time — each folder logs in as whichever persona it needs, so later folders don't silently depend on state left over from earlier ones, EXCEPT folders 6-10 which reuse {{equipment_id}}/{{category_id}}/{{location_id}} captured by folders 5 and 6.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
@@ -263,10 +263,10 @@
       "description": "Run folder 5 first so {{category_id}}/{{location_id}} are populated. Leaves an active Provider1 session and a real {{equipment_id}} for folders 7-10."
     },
     {
-      "name": "11 - US4-1",
+      "name": "11 - US4-1-4-3",
       "item": [
         {
-          "name": "Scope 1: Create br and view br",
+          "name": "Scope 1",
           "item": [
             {
               "name": "Login As borrower_1(setup)",
@@ -339,7 +339,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\"borrower_id\" : \"f069e110-f4b3-40b5-8af5-bd30c26f1da8\",\r\n  \"equipment_id\": \"{{equipment_id}}\",\r\n  \"pickup_date\": \"{{timestamp1}}\",\r\n  \"due_date\": \"{{timestamp2}}\",\r\n  \"purpose\": \"timestamp 1 is <= timestamp2\"\r\n}",
+                  "raw": "{\r\n  \"equipment_id\": \"{{equipment_id}}\",\r\n  \"pickup_date\": \"{{timestamp1}}\",\r\n  \"due_date\": \"{{timestamp2}}\",\r\n  \"purpose\": \"timestamp 1 is <= timestamp2\"\r\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -570,10 +570,11 @@
               },
               "response": []
             }
-          ]
+          ],
+          "description": "scope 1: login as `borrower_1` and try to create request valid and invalid one including get all borrower requests borrower_1 owned and get borrower requests {id}"
         },
         {
-          "name": "Scope 2: Test",
+          "name": "Scope 2",
           "item": [
             {
               "name": "Login As borrower_2(switch)",
@@ -681,10 +682,11 @@
               },
               "response": []
             }
-          ]
+          ],
+          "description": "scope 2: login as `borrower_2` and try to access request that create by `borrower_1` ,try invalid {id}"
         },
         {
-          "name": "Scope 3:",
+          "name": "Scope 3",
           "item": [
             {
               "name": "Login As borrower_2(switch)",
@@ -890,10 +892,708 @@
               },
               "response": []
             }
-          ]
+          ],
+          "description": "scope 3: login as `borrower_2` and try to create request using `borrower1` id(we will replace req.body.id with req.param.id then create the request ) and using `borrower2` id"
+        },
+        {
+          "name": "Scope 4",
+          "item": [
+            {
+              "name": "Login As borrower_1(setup)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has('sessionid')).to.be.true; });\n\nvar jsonData = pm.response.json();\n\nif (jsonData.id) {\n    pm.environment.set(\"borrower1_user_id\", jsonData.id);\n}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"email\": \"{{borrower_email}}\", \"password\": \"{{password}}\"}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/login",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Invalid Borrower Request(due_date is past)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status code is 400 Bad Request\", function () {\r\n    pm.response.to.have.status(400);\r\n});\r\n\r\npm.test(\"Response contains valid error structure\", function () {\r\n    const jsonData = pm.response.json();\r\n    pm.expect(jsonData).to.be.an(\"object\");\r\n    pm.expect(pm.response.code).to.eql(400);\r\n});"
+                    ]
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const moment = require('moment');\r\n\r\n// Subtract 3 days to get a past date\r\nconst  past_t= moment().subtract(3, 'days').format(\"YYYY-MM-DD\");\r\n\r\n// Add 3 days from today for the due date\r\nconst furure_t = moment().add(3, 'days').format(\"YYYY-MM-DD\");\r\n\r\npm.variables.set(\"timestamp\", furure_t);\r\npm.variables.set(\"past_time\", past_t);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"equipment_id\": \"{{equipment_id}}\",\r\n  \"pickup_date\": \"{{timestamp}}\",\r\n  \"due_date\": \"{{past_time}}\",\r\n  \"purpose\": \"due_date is a past\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/requests/borrow-requests/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "requests",
+                    "borrow-requests",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Invalid Borrower Request(pick_up_date is past)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status code is 400 Bad Request\", function () {\r\n    pm.response.to.have.status(400);\r\n});\r\n\r\npm.test(\"Response contains valid error structure\", function () {\r\n    const jsonData = pm.response.json();\r\n    pm.expect(jsonData).to.be.an(\"object\");\r\n    pm.expect(pm.response.code).to.eql(400);\r\n});"
+                    ]
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const moment = require('moment');\r\n\r\n// Subtract 3 days to get a past date\r\nconst  past_t= moment().subtract(3, 'days').format(\"YYYY-MM-DD\");\r\n\r\n// Add 3 days from today for the due date\r\nconst furure_t = moment().add(3, 'days').format(\"YYYY-MM-DD\");\r\n\r\npm.variables.set(\"timestamp\", furure_t);\r\npm.variables.set(\"past_time\", past_t);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"equipment_id\": \"{{equipment_id}}\",\r\n  \"pickup_date\": \"{{past_time}}\",\r\n  \"due_date\": \"{{timestamp}}\",\r\n  \"purpose\": \"pickup_date is a past\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/requests/borrow-requests/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "requests",
+                    "borrow-requests",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Scope 4 :handle due_date,pickup_date are the past"
+        },
+        {
+          "name": "Scope 5",
+          "item": [
+            {
+              "name": "Login As borrower_1(setup)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has('sessionid')).to.be.true; });\n\nvar jsonData = pm.response.json();\n\nif (jsonData.id) {\n    pm.environment.set(\"borrower1_user_id\", jsonData.id);\n}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"email\": \"{{borrower_email}}\", \"password\": \"{{password}}\"}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/login",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Borrower Request(Valid)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var jsonData = pm.response.json();\r\n\r\nif (jsonData.id) {\r\n    pm.environment.set(\"borrower_request_id\", jsonData.id);\r\n}\r\nTest: pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"equipment_id\": \"{{equipment_id}}\",\r\n  \"pickup_date\": \"{{PICKUP_DATE1}}\",\r\n  \"due_date\": \"{{DUE_DATE1}}\",\r\n  \"purpose\": \"Create fisrt time\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/requests/borrow-requests/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "requests",
+                    "borrow-requests",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Borrower Request(Valid) Copy 2",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var jsonData = pm.response.json();\r\n\r\nif (jsonData.id) {\r\n    pm.environment.set(\"borrower_request_id\", jsonData.id);\r\n}\r\nTest: pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"equipment_id\": \"{{equipment_id}}\",\r\n  \"pickup_date\": \"{{PICKUP_DATE1}}\",\r\n  \"due_date\": \"{{DUE_DATE1}}\",\r\n  \"purpose\": \"Create second time\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/requests/borrow-requests/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "requests",
+                    "borrow-requests",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Scope5: Pending requests won't check overlap"
+        },
+        {
+          "name": "Scope 6",
+          "item": [
+            {
+              "name": "Login As borrower_3(setup)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has('sessionid')).to.be.true; });\n\nvar jsonData = pm.response.json();\n"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"email\": \"{{borrower3_email}}\", \"password\": \"{{password}}\"}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/login",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get All Borrower Requests Owned by brw3",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/requests/borrow-requests/mine",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "requests",
+                    "borrow-requests",
+                    "mine"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Invalid Borrower Request(same range)",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const moment = require('moment');\r\n\r\nconst pickupDate = moment().format(\"YYYY-MM-DD\");\r\n\r\nconst dueDate = moment().add(3, 'days').format(\"YYYY-MM-DD\");\r\n\r\npm.variables.set(\"timestamp1\", pickupDate);\r\npm.variables.set(\"timestamp2\", dueDate);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "Test: pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"equipment_id\": \"fb1a8866-14ef-4d41-9bd2-a908e6edbdbd\",\r\n  \"pickup_date\": \"2033-3-13\",\r\n  \"due_date\": \"2033-3-23\",\r\n  \"purpose\": \"Exact Same Date Range\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/requests/borrow-requests/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "requests",
+                    "borrow-requests",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Invalid Borrower Request(overlapping start date)",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const moment = require('moment');\r\n\r\nconst pickupDate = moment().format(\"YYYY-MM-DD\");\r\n\r\nconst dueDate = moment().add(3, 'days').format(\"YYYY-MM-DD\");\r\n\r\npm.variables.set(\"timestamp1\", pickupDate);\r\npm.variables.set(\"timestamp2\", dueDate);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "Test: pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"equipment_id\": \"fb1a8866-14ef-4d41-9bd2-a908e6edbdbd\",\r\n  \"pickup_date\": \"2033-3-20\",\r\n  \"due_date\": \"2033-3-30\",\r\n  \"purpose\": \"pickup_date_new(3-20)< due_date_old(3-23)\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/requests/borrow-requests/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "requests",
+                    "borrow-requests",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Invalid Borrower Request(overlapping last date)",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const moment = require('moment');\r\n\r\nconst pickupDate = moment().format(\"YYYY-MM-DD\");\r\n\r\nconst dueDate = moment().add(3, 'days').format(\"YYYY-MM-DD\");\r\n\r\npm.variables.set(\"timestamp1\", pickupDate);\r\npm.variables.set(\"timestamp2\", dueDate);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "Test: pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"equipment_id\": \"fb1a8866-14ef-4d41-9bd2-a908e6edbdbd\",\r\n  \"pickup_date\": \"2033-3-10\",\r\n  \"due_date\": \"2033-3-20\",\r\n  \"purpose\": \"due_date_new(3-20)>pick_up_old(3-13)\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/requests/borrow-requests/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "requests",
+                    "borrow-requests",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Invalid Borrower Request(start before, end after)",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const moment = require('moment');\r\n\r\nconst pickupDate = moment().format(\"YYYY-MM-DD\");\r\n\r\nconst dueDate = moment().add(3, 'days').format(\"YYYY-MM-DD\");\r\n\r\npm.variables.set(\"timestamp1\", pickupDate);\r\npm.variables.set(\"timestamp2\", dueDate);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "Test: pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"equipment_id\": \"fb1a8866-14ef-4d41-9bd2-a908e6edbdbd\",\r\n  \"pickup_date\": \"2033-2-13\",\r\n  \"due_date\": \"2033-4-23\",\r\n  \"purpose\": \"change month \"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/requests/borrow-requests/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "requests",
+                    "borrow-requests",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Borrower Request with his user id Copy",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const moment = require('moment');\r\n\r\nconst pickupDate = moment().format(\"YYYY-MM-DD\");\r\n\r\nconst dueDate = moment().add(3, 'days').format(\"YYYY-MM-DD\");\r\n\r\npm.variables.set(\"timestamp1\", pickupDate);\r\npm.variables.set(\"timestamp2\", dueDate);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"status is 201\", function () { pm.response.to.have.status(201); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"equipment_id\": \"fb1a8866-14ef-4d41-9bd2-a908e6edbdbd\",\r\n  \"pickup_date\": \"2033-3-23\",\r\n  \"due_date\": \"2033-3-24\",\r\n  \"purpose\": \"Starts exactly on the day Request A is due.\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/requests/borrow-requests/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "requests",
+                    "borrow-requests",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Login As borrower_1(switch)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"status is 200\", function () { pm.response.to.have.status(200); });\npm.test(\"session cookie was set\", function () { pm.expect(pm.cookies.has('sessionid')).to.be.true; });\n\nvar jsonData = pm.response.json();\n\nif (jsonData.id) {\n    pm.environment.set(\"borrower1_user_id\", jsonData.id);\n}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"email\": \"{{borrower_email}}\", \"password\": \"{{password}}\"}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/login",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Invalid Borrower Request(start before, end after) Copy",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const moment = require('moment');\r\n\r\nconst pickupDate = moment().format(\"YYYY-MM-DD\");\r\n\r\nconst dueDate = moment().add(3, 'days').format(\"YYYY-MM-DD\");\r\n\r\npm.variables.set(\"timestamp1\", pickupDate);\r\npm.variables.set(\"timestamp2\", dueDate);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "Test: pm.test(\"status is 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"equipment_id\": \"fb1a8866-14ef-4d41-9bd2-a908e6edbdbd\",\r\n  \"pickup_date\": \"2033-2-13\",\r\n  \"due_date\": \"2033-4-23\",\r\n  \"purpose\": \"change month \"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/requests/borrow-requests/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "requests",
+                    "borrow-requests",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Scope 6 : login as `borrower3` because this account have borrow_request that status is `Approved`\n\nwe checking for overlaped"
         }
       ],
-      "description": "run 5,6 first\n\nscope 1: login as `borrower_1` and try to create request valid and invalid one including get all borrower requests borrower_1 owned and get borrower requests {id}\n\nscope 2: login as `borrower_2` and try to access request that create by `borrower_1` ,try invalid {id}\n\nscope 3: login as `borrower_2` and try to create request using `borrower1` id(we will replace req.body.id with req.param.id then create the request ) and using `borrower2` id"
+      "description": "run 5,6 first\n\nscope 1 cover US4-1\n\nscope 2,3 cover US4-3\n\nscope 4,5,6 cover US4-2"
     }
   ],
   "event": [
@@ -956,6 +1656,10 @@
       "value": "borrower2@chula.ac.th"
     },
     {
+      "key": "borrower3_email",
+      "value": "borrower3@chula.ac.th"
+    },
+    {
       "key": "csrf_token",
       "value": ""
     },
@@ -986,6 +1690,14 @@
     {
       "key": "borrower2_user_id",
       "value": ""
+    },
+    {
+      "key": "PICKUP_DATE1",
+      "value": "2067-11-13"
+    },
+    {
+      "key": "DUE_DATE1",
+      "value": "2067-11-23"
     }
   ]
 }

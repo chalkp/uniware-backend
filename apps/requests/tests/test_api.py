@@ -4,75 +4,10 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APIClient
 
-# Adjust these imports according to your actual app structure
-from apps.equipment.models import Category, Equipment, Location
 from apps.requests.models import BorrowRequest
 
 User = get_user_model()
-
-
-@pytest.fixture
-def api_client():
-    return APIClient()
-
-
-@pytest.fixture
-def borrower():
-    """Create a standard borrower user."""
-    return User.objects.create_user(email="borrower@chula.ac.th", password="password123", is_borrower=True)
-
-
-@pytest.fixture
-def available_equipment(db):
-    """Create dependencies and an AVAILABLE piece of equipment."""
-    provider = User.objects.create_user(email="provider@chula.ac.th", password="password123")
-    category = Category.objects.create(name="Electronics")
-    location = Location.objects.create(name="Main Library")
-
-    return Equipment.objects.create(
-        asset_id="EQ-1001",
-        name="MacBook Pro",
-        provider=provider,
-        category=category,
-        location=location,
-        status="AVAILABLE",
-    )
-
-
-@pytest.fixture
-def checked_out_equipment(db, available_equipment):
-    """Create a piece of equipment that is NOT requestable."""
-    available_equipment.id = None
-    available_equipment.asset_id = "EQ-1002"
-    available_equipment.status = "CHECKED_OUT"
-    available_equipment.save()
-    return available_equipment
-
-
-@pytest.mark.django_db
-class TestBorrowRequestModel:
-    def test_create_borrow_request_model(self, borrower, available_equipment):
-        """Test the data model creation, relationships, and default status."""
-        pickup = date.today()
-        due = pickup + timedelta(days=3)
-
-        request = BorrowRequest.objects.create(
-            borrower=borrower,
-            equipment=available_equipment,
-            pickup_date=pickup,
-            due_date=due,
-            purpose="Project research",
-        )
-
-        assert request.id is not None
-        assert request.borrower == borrower
-        assert request.equipment == available_equipment
-        # Status should default to PENDING
-        assert request.status == BorrowRequest.StatusChoices.PENDING
-        assert request.decision_reason == ""
-        assert str(request) == f"Request {request.id} - PENDING"
 
 
 @pytest.mark.django_db
@@ -132,15 +67,53 @@ class TestBorrowRequestAPI:
         assert "due_date" in error_details
         assert "purpose" in error_details
 
-    def test_create_request_invalid_dates(self, api_client, borrower, available_equipment):
-        """Test API validates that due_date is on or after pickup_date."""
+    def test_create_request_past_pickup_date(self, api_client, borrower, available_equipment):
+        """Test API validates that pickup_date cannot be in the past."""
         api_client.force_authenticate(user=borrower)
 
         payload = {
             "equipment_id": str(available_equipment.id),
-            "pickup_date": date.today().isoformat(),
-            "due_date": (date.today() - timedelta(days=1)).isoformat(),  # Due before pickup
-            "purpose": "Time travel",
+            "pickup_date": (date.today() - timedelta(days=1)).isoformat(),  # Past date
+            "due_date": (date.today() + timedelta(days=2)).isoformat(),  # Valid future date
+            "purpose": "Testing pickup past date",
+        }
+
+        response = api_client.post(self.get_url(), payload, format="json")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        error_details = response.data["error"]["details"]
+        assert "pickup_date" in error_details
+        assert error_details["pickup_date"][0] == "Pickup date cannot be in the past."
+        assert "due_date" not in error_details
+
+    def test_create_request_past_due_date(self, api_client, borrower, available_equipment):
+        """Test API validates that due_date cannot be in the past."""
+        api_client.force_authenticate(user=borrower)
+
+        payload = {
+            "equipment_id": str(available_equipment.id),
+            "pickup_date": date.today().isoformat(),  # Valid current date
+            "due_date": (date.today() - timedelta(days=1)).isoformat(),  # Past date
+            "purpose": "Testing due past date",
+        }
+
+        response = api_client.post(self.get_url(), payload, format="json")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        error_details = response.data["error"]["details"]
+        assert "due_date" in error_details
+        assert error_details["due_date"][0] == "Due date cannot be in the past."
+
+    def test_create_request_invalid_dates(self, api_client, borrower, available_equipment):
+        """Test API validates that due_date is on or after pickup_date."""
+        api_client.force_authenticate(user=borrower)
+
+        # Uses future dates to isolate the `due_date < pickup_date` rule from the past date rule
+        payload = {
+            "equipment_id": str(available_equipment.id),
+            "pickup_date": (date.today() + timedelta(days=2)).isoformat(),
+            "due_date": (date.today() + timedelta(days=1)).isoformat(),  # Due before pickup
+            "purpose": "Time travel backwards",
         }
 
         response = api_client.post(self.get_url(), payload, format="json")
@@ -154,7 +127,7 @@ class TestBorrowRequestAPI:
         assert error_details["due_date"][0] == "due_date must be on or after pickup_date."
 
     def test_create_request_unavailable_equipment(self, api_client, borrower, checked_out_equipment):
-        """Test API prevents requesting equipment that is not AVAILABLE or RESERVED."""
+        """Test API prevents requesting equipment that is not AVAILABLE."""
         api_client.force_authenticate(user=borrower)
 
         payload = {
@@ -173,6 +146,38 @@ class TestBorrowRequestAPI:
 
         assert "equipment_id" in error_details
         assert error_details["equipment_id"][0] == "This equipment is currently not available for borrowing."
+
+    def test_create_request_overlapping_availability(self, api_client, borrower, available_equipment):
+        """Test API prevents booking if dates overlap with an APPROVED/CHECKED_OUT request."""
+        # Create a blocking request
+        BorrowRequest.objects.create(
+            borrower=borrower,
+            equipment=available_equipment,
+            pickup_date=date.today() + timedelta(days=1),
+            due_date=date.today() + timedelta(days=5),
+            purpose="Existing booking",
+            status=BorrowRequest.StatusChoices.APPROVED,
+        )
+
+        api_client.force_authenticate(user=borrower)
+
+        # Attempt to overlap
+        payload = {
+            "equipment_id": str(available_equipment.id),
+            "pickup_date": (date.today() + timedelta(days=2)).isoformat(),
+            "due_date": (date.today() + timedelta(days=4)).isoformat(),
+            "purpose": "Overlap request",
+        }
+
+        response = api_client.post(self.get_url(), payload, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        error_details = response.data["error"]["details"]
+        assert "non_field_errors" in error_details
+        assert (
+            error_details["non_field_errors"][0] == "The equipment is already booked during this date range."
+        )
 
     def test_get_mine_requests_success(self, api_client, borrower, available_equipment):
         """Test the 'mine' endpoint returns only the authenticated user's requests ordered by pickup_date."""
@@ -211,8 +216,8 @@ class TestBorrowRequestAPI:
 
         assert response.status_code == status.HTTP_200_OK
 
-        # FIX: Extract results from the paginated response
-        # Using .get() ensures it still works if you ever turn pagination off
+        # Extract results from the paginated response
+        # Using .get() ensures it still works if pagination is turned off
         results = response.data.get("results", response.data)
 
         assert len(results) == 2
