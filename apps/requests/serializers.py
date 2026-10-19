@@ -87,8 +87,7 @@ class BorrowRequestSerializer(serializers.ModelSerializer):
             and pickup_date
             and due_date
             and (
-                not self.instance
-                or any(field in attrs for field in ("equipment", "pickup_date", "due_date"))
+                not self.instance or any(field in attrs for field in ("equipment", "pickup_date", "due_date"))
             )
             and not check_equipment_availability(equipment.id, pickup_date, due_date)
         ):
