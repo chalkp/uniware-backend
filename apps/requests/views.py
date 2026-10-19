@@ -1,6 +1,6 @@
 from django.db import transaction
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -125,8 +125,15 @@ class IsActiveProvider(IsProvider):
 
 
 @extend_schema_view(
-    list=extend_schema(summary="List requests for my equipment"),
-    retrieve=extend_schema(summary="Get a request for my equipment"),
+    list=extend_schema(
+        summary="List requests for my equipment",
+        description="Returns requests made for equipment managed by the authenticated provider.",
+        parameters=[OpenApiParameter("status", type=str, description="Filter by request status")],
+    ),
+    retrieve=extend_schema(
+        summary="Get a request for my equipment",
+        description="Returns 404 if the request is not managed by the authenticated provider.",
+    ),
 )
 class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     serializer_class = ProviderBorrowRequestSerializer
@@ -144,8 +151,9 @@ class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMi
         filters = ProviderRequestListFilterSerializer(data=request.query_params)
         filters.is_valid(raise_exception=True)
         queryset = self.filter_queryset(self.get_queryset())
-        if filters.validated_data["status"] == BorrowRequest.StatusChoices.PENDING:
-            queryset = queryset.filter(status=BorrowRequest.StatusChoices.PENDING)
+        requested_status = filters.validated_data.get("status")
+        if requested_status and requested_status != "ALL":
+            queryset = queryset.filter(status=requested_status)
 
         page = self.paginate_queryset(queryset)
         if page is not None:

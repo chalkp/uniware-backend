@@ -39,7 +39,7 @@ def test_provider_request_list_is_scoped_and_filters_status(auth_client, borrowe
     make_request(borrower, other_equipment)
     client = auth_client(provider)
 
-    pending_response = client.get(provider_request_url())
+    pending_response = client.get(provider_request_url(), {"status": "PENDING"})
     all_response = client.get(provider_request_url(), {"status": "ALL"})
 
     assert pending_response.status_code == 200

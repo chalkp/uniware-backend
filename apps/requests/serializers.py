@@ -20,8 +20,8 @@ class BorrowerSummarySerializer(serializers.ModelSerializer):
 
 class ProviderRequestListFilterSerializer(serializers.Serializer):
     status = serializers.ChoiceField(
-        choices=(("PENDING", "Pending"), ("ALL", "All")),
-        default="PENDING",
+        choices=tuple((choice.value, choice.label) for choice in BorrowRequest.StatusChoices)
+        + (("ALL", "All"),),
         required=False,
     )
 
