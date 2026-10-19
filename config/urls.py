@@ -12,4 +12,5 @@ urlpatterns = [
     path("api/profile", ProfileView.as_view(), name="profile"),
     path("api/", include("apps.equipment.urls")),
     path("api/requests/", include("apps.requests.urls")),
+    path("api/provider/", include("apps.requests.urls_provider")),
 ]

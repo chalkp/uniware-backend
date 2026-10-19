@@ -1,11 +1,20 @@
-from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import mixins, status, viewsets
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
+from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import BorrowRequest
 from .serializers import BorrowRequestSerializer
+
+
+class IsProviderUser(permissions.BasePermission):
+    """Allows access only to users with the is_provider flag set to True."""
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user and request.user.is_authenticated and getattr(request.user, "is_provider", False)
+        )
 
 
 @extend_schema_view(
@@ -98,3 +107,40 @@ class BorrowRequestViewSet(
         serializer = self.get_serializer(borrow_request)
 
         return Response(serializer.data)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="List Provider's Equipment Requests",
+        description="Returns requests made for equipment managed by the authenticated provider.",
+        parameters=[OpenApiParameter("status", type=str, description="Filter by status (e.g., PENDING)")],
+    ),
+    retrieve=extend_schema(
+        summary="Get Provider Request Detail",
+        description=(
+            "Retrieve a specific request.Returns 404 if the doesn't exist or managed by the provider."
+        ),
+    ),
+)
+class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """US5-1, US5-2"""
+
+    serializer_class = BorrowRequestSerializer
+    permission_classes = [permissions.IsAuthenticated, IsProviderUser]
+
+    def get_queryset(self):
+        # Strictly scope to equipment owned by the requesting provider
+        queryset = (
+            BorrowRequest.objects.filter(equipment__provider=self.request.user)
+            .select_related(
+                "borrower", "equipment", "equipment__category", "equipment__location", "decided_by"
+            )
+            .order_by("pickup_date")
+        )
+
+        # US5-1: Handle status filtering
+        status_param = self.request.query_params.get("status")
+        if status_param:
+            queryset = queryset.filter(status=status_param.upper())
+
+        return queryset
