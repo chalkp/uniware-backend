@@ -16,6 +16,12 @@ def test_us3_1_shows_active_visible_equipment_with_summary_info(auth_client, bor
     item = next(i for i in response.data["results"] if i["id"] == str(visible.id))
     assert item["name"] == "Visible Item"
     assert "category" in item and "location" in item and "status" in item
+    assert item["provider"] == str(visible.provider_id)  # preserved for borrowing permissions
+    assert item["owner"] == {
+        "name": f"{visible.provider.first_name} {visible.provider.last_name}",
+        "email": visible.provider.email,
+        "department": visible.provider.department,
+    }
 
 
 def test_us3_1_excludes_archived_and_disabled_equipment(auth_client, borrower):

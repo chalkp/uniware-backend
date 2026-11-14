@@ -1,6 +1,10 @@
-from django.contrib.auth import authenticate
+from django.contrib.auth import SESSION_KEY, authenticate
+from django.db import transaction
+from django.shortcuts import get_object_or_404
 from django.contrib.auth import login as django_login
 from django.contrib.auth import logout as django_logout
+from django.contrib.sessions.models import Session
+from django.utils import timezone
 from django.middleware.csrf import get_token
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -9,8 +13,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .exceptions import InvalidCredentials
-from .serializers import LoginSerializer, ProfileSerializer, RegisterSerializer, UserSerializer
+from .serializers import (
+    LoginSerializer, ProfileSerializer, RegisterSerializer, UserSerializer,
+    UserRoleUpdateSerializer, UserStatusUpdateSerializer,
+)
 
+from apps.common.permissions import IsAdmin
+from .models import AccountStatus, User
 
 class RegisterView(APIView):
     """US1-1"""
@@ -40,7 +49,7 @@ class LoginView(APIView):
             username=serializer.validated_data["email"].strip().lower(),
             password=serializer.validated_data["password"],
         )
-        if user is None:
+        if user is None or not user.is_active or user.account_status != AccountStatus.ACTIVE:
             raise InvalidCredentials("Invalid email or password.")
         django_login(request, user)
         get_token(request)
@@ -81,3 +90,57 @@ class ProfileView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(ProfileSerializer(serializer.instance).data, status=status.HTTP_200_OK)
+
+class UserManagementView(APIView):
+    """US8-1, US8-2"""
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        users = User.objects.all().order_by("email")
+        return Response(UserSerializer(users, many=True).data)
+
+    def patch(self, request, user_id):
+        target = get_object_or_404(User, id=user_id)
+        if target.id == request.user.id and request.data.get("is_admin") is False:
+            return Response(
+                {"detail": "You cannot remove your own admin role."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = UserRoleUpdateSerializer(target, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(UserSerializer(target).data, status=status.HTTP_200_OK)
+
+
+class UserStatusView(APIView):
+    """Allow administrators to suspend or reactivate other users."""
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    @extend_schema(request=UserStatusUpdateSerializer, responses={200: UserSerializer})
+    @transaction.atomic
+    def patch(self, request, user_id):
+        serializer = UserStatusUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        target = get_object_or_404(User.objects.select_for_update(), id=user_id)
+        next_status = serializer.validated_data["account_status"]
+        if target.id == request.user.id and next_status == AccountStatus.SUSPENDED:
+            return Response(
+                {"detail": "You cannot suspend your own administrator account."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        target.account_status = next_status
+        # Django's ModelBackend denies login and invalidates existing sessions when
+        # is_active is False, so suspension is effective immediately.
+        target.is_active = next_status == AccountStatus.ACTIVE
+        target.save(update_fields=["account_status", "is_active"])
+        if next_status == AccountStatus.SUSPENDED:
+            # Database-backed sessions are configured in config/settings/base.py.
+            # Invalidate all of this user's sessions so reactivation requires a new login.
+            for session in Session.objects.filter(expire_date__gt=timezone.now()).iterator():
+                if session.get_decoded().get(SESSION_KEY) == str(target.id):
+                    session.delete()
+        return Response(UserSerializer(target).data, status=status.HTTP_200_OK)

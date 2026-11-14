@@ -6,7 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.accounts.models import AccountStatus
+from apps.accounts.models import AccountStatus, User
 from apps.common.exceptions import BookingConflict, InvalidStateTransition
 from apps.common.permissions import IsProvider
 from apps.equipment.models import Equipment, EquipmentStatus
@@ -17,8 +17,27 @@ from .serializers import (
     ProviderBorrowRequestSerializer,
     ProviderRequestListFilterSerializer,
     RejectionReasonSerializer,
+    ReturnConditionSerializer,
 )
 from .services import check_equipment_availability
+
+
+def order_requests_for_filter(queryset, requested_status):
+    """Order complete querysets before pagination, using the selected tab's date.
+
+    'ALL' and the other request states use the pickup date. The CHECKED_OUT
+    and RETURNED tabs use the scheduled return (due_date), not returned_at.
+    The primary key makes same-date ordering deterministic across pages.
+    """
+    date_field = (
+        "due_date"
+        if requested_status in (
+            BorrowRequest.StatusChoices.CHECKED_OUT,
+            BorrowRequest.StatusChoices.RETURNED,
+        )
+        else "pickup_date"
+    )
+    return queryset.order_by(date_field, "id")
 
 
 @extend_schema_view(
@@ -55,10 +74,13 @@ class BorrowRequestViewSet(
 
     def get_queryset(self):
         """US4-4, US4-5"""
+        queryset = BorrowRequest.objects.filter(borrower=self.request.user)
+        if self.action == "checkout":
+            queryset = queryset.select_for_update(of=("self",))
         return (
-            BorrowRequest.objects.filter(borrower=self.request.user)
+            queryset
             .select_related(
-                "borrower", "equipment", "equipment__category", "equipment__location", "decided_by"
+                "borrower", "equipment", "equipment__provider", "equipment__category", "equipment__location", "decided_by"
             )
             .order_by("-pickup_date")
         )
@@ -73,12 +95,19 @@ class BorrowRequestViewSet(
         summary="List my borrow requests",
         description=(
             "Returns a list of all borrow requests made by the currently "
-            "authenticated user, ordered by pickup date."
+            "authenticated user. CHECKED_OUT and RETURNED results are ordered by due date; "
+            "other filters are ordered by pickup date, earliest first."
         ),
     )
     @action(detail=False, methods=["get"], url_path="mine")
     def mine(self, request):
+        filters = ProviderRequestListFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
         queryset = self.filter_queryset(self.get_queryset())
+        requested_status = filters.validated_data.get("status")
+        if requested_status and requested_status != "ALL":
+            queryset = queryset.filter(status=requested_status)
+        queryset = order_requests_for_filter(queryset, requested_status)
 
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -112,6 +141,25 @@ class BorrowRequestViewSet(
 
         return Response(serializer.data)
 
+    @extend_schema(summary="Check out an approved request")
+    @action(detail=True, methods=["post"], url_path="checkout")
+    @transaction.atomic
+    def checkout(self, request, pk=None):
+        """Only the borrower can confirm possession of their approved equipment."""
+        borrow_request = self.get_object()
+        if borrow_request.status != BorrowRequest.StatusChoices.APPROVED:
+            raise InvalidStateTransition("Only approved requests can be checked out.")
+
+        equipment = Equipment.objects.select_for_update().get(pk=borrow_request.equipment_id)
+        if equipment.status not in (EquipmentStatus.AVAILABLE, EquipmentStatus.RESERVED):
+            raise BookingConflict("Equipment cannot be checked out in its current state.")
+        borrow_request.status = BorrowRequest.StatusChoices.CHECKED_OUT
+        borrow_request.save(update_fields=["status"])
+        equipment.status = EquipmentStatus.CHECKED_OUT
+        equipment.save(update_fields=["status", "updated_at"])
+        borrow_request.refresh_from_db()
+        return Response(self.get_serializer(borrow_request).data)
+
 
 class IsActiveProvider(IsProvider):
     message = "This action requires an active provider account."
@@ -141,9 +189,9 @@ class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMi
 
     def get_queryset(self):
         queryset = BorrowRequest.objects.filter(equipment__provider=self.request.user).select_related(
-            "borrower", "equipment", "equipment__category", "equipment__location", "decided_by"
+            "borrower", "equipment", "equipment__provider", "equipment__category", "equipment__location", "decided_by"
         )
-        if self.action in ("approve", "reject"):
+        if self.action in ("approve", "reject", "mark_returned"):
             queryset = queryset.select_for_update(of=("self",))
         return queryset.order_by("pickup_date", "id")
 
@@ -154,6 +202,7 @@ class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMi
         requested_status = filters.validated_data.get("status")
         if requested_status and requested_status != "ALL":
             queryset = queryset.filter(status=requested_status)
+        queryset = order_requests_for_filter(queryset, requested_status)
 
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -167,6 +216,12 @@ class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMi
         borrow_request = self.get_object()
         if borrow_request.status != BorrowRequest.StatusChoices.PENDING:
             raise InvalidStateTransition("Only pending requests can be approved.")
+
+        # Lock the borrower row against concurrent suspension/reactivation so a
+        # suspension cannot race with an approval decision.
+        borrower = User.objects.select_for_update().get(pk=borrow_request.borrower_id)
+        if borrower.account_status == AccountStatus.SUSPENDED or not borrower.is_active:
+            raise InvalidStateTransition("Suspended borrowers cannot have requests approved.")
 
         equipment = Equipment.objects.select_for_update().get(pk=borrow_request.equipment_id)
         if equipment.status != EquipmentStatus.AVAILABLE or not check_equipment_availability(
@@ -196,4 +251,29 @@ class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMi
         borrow_request.decided_by = request.user
         borrow_request.decided_at = timezone.now()
         borrow_request.save(update_fields=["status", "decision_reason", "decided_by", "decided_at"])
+        return Response(self.get_serializer(borrow_request).data)
+
+
+    @extend_schema(summary="Record returned equipment and its condition")
+    @action(detail=True, methods=["post"], url_path="return")
+    @transaction.atomic
+    def mark_returned(self, request, pk=None):
+        """Only the owner of the equipment can record its return."""
+        borrow_request = self.get_object()
+        if borrow_request.status != BorrowRequest.StatusChoices.CHECKED_OUT:
+            raise InvalidStateTransition("Only checked out requests can be marked returned.")
+
+        note = ReturnConditionSerializer(data=request.data)
+        note.is_valid(raise_exception=True)
+        equipment = Equipment.objects.select_for_update().get(pk=borrow_request.equipment_id)
+        borrow_request.return_condition = note.validated_data["return_condition"]
+        borrow_request.returned_at = timezone.now()
+        borrow_request.status = BorrowRequest.StatusChoices.RETURNED
+        borrow_request.save(update_fields=["status", "return_condition", "returned_at"])
+        # The transaction serializes concurrent returns against checkout operations.
+        # Maintenance/disabled inventory states, if applied separately, are preserved.
+        if equipment.status == EquipmentStatus.CHECKED_OUT:
+            equipment.status = EquipmentStatus.AVAILABLE
+            equipment.save(update_fields=["status", "updated_at"])
+        borrow_request.refresh_from_db()
         return Response(self.get_serializer(borrow_request).data)

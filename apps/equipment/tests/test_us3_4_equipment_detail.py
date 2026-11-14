@@ -19,6 +19,11 @@ def test_us3_4_shows_detail_for_visible_equipment(auth_client, borrower):
     assert response.data["category"]["id"] == str(equipment.category_id)
     assert response.data["location"]["id"] == str(equipment.location_id)
     assert response.data["status"] == EquipmentStatus.AVAILABLE
+    assert response.data["owner"] == {
+        "name": f"{equipment.provider.first_name} {equipment.provider.last_name}",
+        "email": equipment.provider.email,
+        "department": equipment.provider.department,
+    }
 
 
 def test_us3_4_returns_not_found_for_nonexistent_equipment(auth_client, borrower):

@@ -63,7 +63,7 @@ class ProviderEquipmentListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsProvider]
 
     def get_queryset(self):
-        return Equipment.objects.filter(provider=self.request.user).select_related("category", "location")
+        return Equipment.objects.filter(provider=self.request.user).select_related("category", "location", "provider")
 
 
 class CategoryListView(generics.ListAPIView):
