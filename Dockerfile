@@ -21,8 +21,11 @@ ENV PATH="/app/.venv/bin:$PATH" \
 
 COPY --from=builder /app/.venv /app/.venv
 COPY --chown=uniware:uniware . .
-COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && mkdir -p /app/staticfiles && chown -R uniware:uniware /app/staticfiles
+
+COPY --chown=uniware:uniware docker/entrypoint.sh /entrypoint.sh
+RUN chmod 755 /entrypoint.sh \
+    && mkdir -p /app/staticfiles \
+    && chown -R uniware:uniware /app/staticfiles
 
 USER uniware
 EXPOSE 8000

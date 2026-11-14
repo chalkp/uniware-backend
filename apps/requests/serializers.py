@@ -104,7 +104,11 @@ class BorrowRequestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"due_date": "due_date must be on or after pickup_date."})
 
         if equipment:
-            if getattr(equipment, "status", None) not in [
+            # Effective suspension blocks new requests and edits without changing the request status.
+            equipment = Equipment.objects.select_related("provider").get(pk=equipment.pk)
+            if equipment.is_suspended and (not self.instance or equipment.id != self.instance.equipment_id):
+                raise serializers.ValidationError({"equipment_id": "This equipment is suspended and cannot be requested or edited."})
+            if (not self.instance or equipment.id != self.instance.equipment_id) and getattr(equipment, "status", None) not in [
                 EquipmentStatus.AVAILABLE,
             ]:
                 raise serializers.ValidationError(

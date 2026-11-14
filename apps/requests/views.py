@@ -86,6 +86,9 @@ class BorrowRequestViewSet(
         )
 
     def perform_create(self, serializer):
+        equipment = serializer.validated_data["equipment"]
+        if Equipment.objects.select_related("provider").get(pk=equipment.pk).is_suspended:
+            raise InvalidStateTransition("Suspended equipment cannot accept new requests.")
         serializer.save(
             borrower=self.request.user,
             status=BorrowRequest.StatusChoices.PENDING,
@@ -149,8 +152,12 @@ class BorrowRequestViewSet(
         borrow_request = self.get_object()
         if borrow_request.status != BorrowRequest.StatusChoices.APPROVED:
             raise InvalidStateTransition("Only approved requests can be checked out.")
+        if borrow_request.pickup_date < timezone.localdate():
+            raise InvalidStateTransition("The pickup date has passed. Arrange a new request with updated dates.")
 
-        equipment = Equipment.objects.select_for_update().get(pk=borrow_request.equipment_id)
+        equipment = Equipment.objects.select_related("provider").select_for_update().get(pk=borrow_request.equipment_id)
+        if equipment.is_suspended:
+            raise InvalidStateTransition("Suspended equipment cannot be checked out.")
         if equipment.status not in (EquipmentStatus.AVAILABLE, EquipmentStatus.RESERVED):
             raise BookingConflict("Equipment cannot be checked out in its current state.")
         borrow_request.status = BorrowRequest.StatusChoices.CHECKED_OUT
@@ -223,7 +230,9 @@ class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMi
         if borrower.account_status == AccountStatus.SUSPENDED or not borrower.is_active:
             raise InvalidStateTransition("Suspended borrowers cannot have requests approved.")
 
-        equipment = Equipment.objects.select_for_update().get(pk=borrow_request.equipment_id)
+        equipment = Equipment.objects.select_related("provider").select_for_update().get(pk=borrow_request.equipment_id)
+        if equipment.is_suspended:
+            raise InvalidStateTransition("Suspended equipment cannot have new approvals.")
         if equipment.status != EquipmentStatus.AVAILABLE or not check_equipment_availability(
             equipment.id, borrow_request.pickup_date, borrow_request.due_date
         ):

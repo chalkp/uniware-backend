@@ -77,6 +77,24 @@ class Equipment(TimeStampedModel):
     disabled_at = models.DateTimeField(null=True, blank=True)
     disabled_reason = models.TextField(blank=True, default="")
 
+    # Administrative hold is independent of inventory availability and owner suspension.
+    admin_suspended = models.BooleanField(default=False)
+    admin_suspension_reason = models.TextField(blank=True, default="")
+    admin_suspended_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def is_suspended(self):
+        return self.admin_suspended or self.provider.account_status == "SUSPENDED" or not self.provider.is_active
+
+    @property
+    def suspension_reason(self):
+        if self.admin_suspended:
+            return self.admin_suspension_reason
+        if self.provider.account_status == "SUSPENDED" or not self.provider.is_active:
+            return "Equipment owner account is suspended."
+        return ""
+
+
     objects = EquipmentQuerySet.as_manager()
 
     class Meta:
@@ -84,3 +102,14 @@ class Equipment(TimeStampedModel):
 
     def __str__(self):
         return f"{self.asset_id} — {self.name}"
+
+
+class EquipmentSuspensionNotice(models.Model):
+    """An in-app notice to an owner or affected borrower (no email required)."""
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="equipment_notices")
+    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, related_name="suspension_notices")
+    message = models.CharField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]

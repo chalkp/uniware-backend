@@ -19,6 +19,8 @@ from .serializers import (
 )
 
 from apps.common.permissions import IsAdmin
+from apps.equipment.models import Equipment
+from apps.equipment.suspension import notify_equipment_change
 from .models import AccountStatus, User
 
 class RegisterView(APIView):
@@ -132,11 +134,18 @@ class UserStatusView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        was_suspended = target.account_status == AccountStatus.SUSPENDED or not target.is_active
         target.account_status = next_status
         # Django's ModelBackend denies login and invalidates existing sessions when
         # is_active is False, so suspension is effective immediately.
         target.is_active = next_status == AccountStatus.ACTIVE
         target.save(update_fields=["account_status", "is_active"])
+        now_suspended = target.account_status == AccountStatus.SUSPENDED or not target.is_active
+        if was_suspended != now_suspended:
+            # All items owned by a suspended user become effectively suspended.
+            # Manual admin holds are not cleared by owner reactivation.
+            for equipment in Equipment.objects.filter(provider=target, admin_suspended=False).select_related("provider"):
+                notify_equipment_change(equipment, now_suspended, reason=equipment.suspension_reason)
         if next_status == AccountStatus.SUSPENDED:
             # Database-backed sessions are configured in config/settings/base.py.
             # Invalidate all of this user's sessions so reactivation requires a new login.
