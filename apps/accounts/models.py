@@ -92,9 +92,9 @@ class ConsentRecord(models.Model):
     class Meta:
         ordering = ["-granted_at"]
 
+    def __str__(self):
+        return f"{self.user.email} ({self.consent_version})"
+
     @classmethod
     def current_text_hash(cls) -> str:
         return hashlib.sha256(cls.CURRENT_CONSENT_TEXT.encode("utf-8")).hexdigest()
-
-    def __str__(self):
-        return f"{self.user.email} ({self.consent_version})"
