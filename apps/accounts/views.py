@@ -9,21 +9,47 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .exceptions import InvalidCredentials
-from .serializers import LoginSerializer, ProfileSerializer, RegisterSerializer, UserSerializer
+from .models import ConsentRecord
+from .serializers import (
+    ConsentCreateSerializer,
+    ConsentRecordSerializer,
+    LoginSerializer,
+    ProfileSerializer,
+    RegisterSerializer,
+    UserSerializer,
+)
 
 
 class RegisterView(APIView):
-    """US1-1"""
+    """US1-1, US1-5"""
 
     permission_classes = [AllowAny]
 
     @extend_schema(request=RegisterSerializer, responses={201: UserSerializer})
     def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
+        serializer = RegisterSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         get_token(request)
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+
+
+class ConsentView(APIView):
+    """US1-5"""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: ConsentRecordSerializer(many=True)})
+    def get(self, request):
+        records = ConsentRecord.objects.filter(user=request.user)
+        return Response(ConsentRecordSerializer(records, many=True).data, status=status.HTTP_200_OK)
+
+    @extend_schema(request=ConsentCreateSerializer, responses={201: ConsentRecordSerializer})
+    def post(self, request):
+        serializer = ConsentCreateSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        record = serializer.save()
+        return Response(ConsentRecordSerializer(record).data, status=status.HTTP_201_CREATED)
 
 
 class LoginView(APIView):
