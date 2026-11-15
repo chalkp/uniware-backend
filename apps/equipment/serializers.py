@@ -68,7 +68,9 @@ class EquipmentSerializer(PhotoSerializerMixin, serializers.ModelSerializer):
         model = Equipment
         fields = [
             "id",
-            "photo", "photo_preview_url", "photo_original_url",
+            "photo",
+            "photo_preview_url",
+            "photo_original_url",
             "asset_id",
             "name",
             "model",
@@ -88,7 +90,17 @@ class EquipmentSerializer(PhotoSerializerMixin, serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "provider", "owner", "is_suspended", "suspension_reason", "archived_at", "disabled_at", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "provider",
+            "owner",
+            "is_suspended",
+            "suspension_reason",
+            "archived_at",
+            "disabled_at",
+            "created_at",
+            "updated_at",
+        ]
 
 
 class EquipmentSuspensionUpdateSerializer(serializers.Serializer):

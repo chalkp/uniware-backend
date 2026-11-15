@@ -1,0 +1,60 @@
+# Equipment and return photos
+
+US2-6 and US7-6 extend the checkout/return workflow from `origin/US6/7/8`.
+
+Send multipart form data with optional `photo` to POST `/api/equipment`, PATCH
+`/api/equipment/{id}`, or POST `/api/provider/requests/{id}/return`. The return
+endpoint still requires `return_condition`. JSON requests without photos remain
+supported. To remove an attachment before retrying a return, omit `photo`.
+
+Equipment responses and provider request responses include nullable
+`photo_preview_url` and `photo_original_url`. These are root-relative authenticated
+API URLs. Use the preview normally and fetch the full-size image on click. A null
+URL or failed download should show a frontend placeholder. Existing photos are
+unchanged when an equipment update omits `photo`.
+
+JPEG (.jpg/.jpeg), PNG and WebP are accepted after inspecting their decoded content.
+Animated files, corrupt files and extension/content mismatches are rejected.
+Incoming files are limited to 20 MiB and 40 million pixels. Preview images are WebP,
+strictly smaller than 1 MiB, with a maximum 1920-pixel long edge and no upscaling.
+Quality starts at 80 with encoding effort 3; additional resizing/compression is
+bounded. Full-size images preserve their extension, format and pixel dimensions
+(dimensions swap when orientation is corrected). Filenames are randomized.
+
+Metadata is removed from both files. Unrotated JPEG compressed image data is
+preserved without re-encoding. JPEGs requiring orientation correction are encoded
+at quality 100 without chroma subsampling, so those are not pixel-exact originals.
+PNG and WebP full-size copies are encoded losslessly. EXIF, GPS, XMP, textual
+metadata and embedded color profiles are not retained.
+
+Both files must save successfully before a return completes. Database failures or
+upload failures roll back state and remove newly written files. Equipment photo
+replacement deletes old files after commit. Cleanup errors are logged for operators;
+storage and database are separate systems, so crash recovery/orphan reconciliation
+is an operational concern. A repeat return receives a state-conflict response.
+
+Equipment photos use catalog visibility rules, with additional owner access for
+inventory items. Return photos are accessible only to the equipment's managing
+provider. Downloads require session authentication and use `private, no-store`.
+Do not configure a public media directory route. Docker stores files in the
+`uniware_media` volume; include it in backups alongside the database.
+
+Deploy with `docker compose up --build` and apply migrations using the project's
+normal migration command. New dependencies are pinned in `uv.lock`. The photo
+fields require no backfill; existing records have no photo.
+
+Run photo integration tests with `uv run pytest apps/common/tests/test_photos.py`.
+Frontend preview/selection, upload progress, placeholders and click-to-open UI
+are separate implementation work.
+
+## Verification notes
+
+All 15 photo tests passed. A local synthetic 4000x3000 noisy JPEG (12,023,490
+bytes) took 0.679 seconds to process and produced a 446,902-byte WebP preview.
+This is a single local measurement, not a production latency guarantee.
+
+The unchanged base branch has six failing tests, reproduced in an isolated
+worktree: a UUID/string assertion in catalog tests, four checkout tests whose
+borrower fixture password differs from the login helper, and a provider test
+attempting login after suspension. The earlier 100%-coverage test branch is not
+part of this base; full-suite coverage must be reconciled when integrating branches.

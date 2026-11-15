@@ -90,7 +90,8 @@ def process_photo(upload):
                 source.load()
                 orientation = source.getexif().get(274, 1)
                 oriented = ImageOps.exif_transpose(source)
-                clean = Image.new("RGBA" if "A" in oriented.getbands() else "RGB", oriented.size)
+                alpha = "A" in oriented.getbands() or "transparency" in oriented.info
+                clean = Image.new("RGBA" if alpha else "RGB", oriented.size)
                 clean.paste(oriented.convert(clean.mode))
                 original = BytesIO()
                 options = {"quality": 100, "subsampling": 0} if expected == "JPEG" else {}
