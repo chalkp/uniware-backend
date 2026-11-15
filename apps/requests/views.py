@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from apps.accounts.models import AccountStatus, User
 from apps.common.exceptions import BookingConflict, InvalidStateTransition
 from apps.common.permissions import IsProvider
+from apps.common.photos import photo_atomic, save_photo
 from apps.equipment.models import Equipment, EquipmentStatus
 
 from .models import BorrowRequest
@@ -265,7 +266,7 @@ class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMi
 
     @extend_schema(summary="Record returned equipment and its condition")
     @action(detail=True, methods=["post"], url_path="return")
-    @transaction.atomic
+    @photo_atomic
     def mark_returned(self, request, pk=None):
         """Only the owner of the equipment can record its return."""
         borrow_request = self.get_object()
@@ -274,6 +275,8 @@ class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMi
 
         note = ReturnConditionSerializer(data=request.data)
         note.is_valid(raise_exception=True)
+        if "photo" in note.validated_data:
+            save_photo(borrow_request, note.validated_data["photo"])
         equipment = Equipment.objects.select_for_update().get(pk=borrow_request.equipment_id)
         borrow_request.return_condition = note.validated_data["return_condition"]
         borrow_request.returned_at = timezone.now()

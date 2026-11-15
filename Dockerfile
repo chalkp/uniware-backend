@@ -24,8 +24,8 @@ COPY --chown=uniware:uniware . .
 
 COPY --chown=uniware:uniware docker/entrypoint.sh /entrypoint.sh
 RUN chmod 755 /entrypoint.sh \
-    && mkdir -p /app/staticfiles \
-    && chown -R uniware:uniware /app/staticfiles
+    && mkdir -p /app/staticfiles /app/media \
+    && chown -R uniware:uniware /app/staticfiles /app/media
 
 USER uniware
 EXPOSE 8000

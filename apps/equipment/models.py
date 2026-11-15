@@ -57,6 +57,8 @@ class Equipment(TimeStampedModel):
     """EPIC2/EPIC3 primary catalog entity"""
 
     asset_id = models.CharField(max_length=64, unique=True)
+    photo_original = models.CharField(max_length=255, blank=True, default="", editable=False)
+    photo_preview = models.CharField(max_length=255, blank=True, default="", editable=False)
     name = models.CharField(max_length=200)
     model = models.CharField(max_length=200, blank=True, default="")
     description = models.TextField(blank=True, default="")

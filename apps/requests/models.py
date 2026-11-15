@@ -33,6 +33,8 @@ class BorrowRequest(models.Model):
     pickup_date = models.DateField(help_text="Inclusive: first day of possession")
     due_date = models.DateField(help_text="Exclusive: handover-back day")
     purpose = models.TextField()
+    photo_original = models.CharField(max_length=255, blank=True, default="", editable=False)
+    photo_preview = models.CharField(max_length=255, blank=True, default="", editable=False)
 
     status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.PENDING)
     decision_reason = models.TextField(blank=True, default="")

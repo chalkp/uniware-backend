@@ -5,6 +5,7 @@ from rest_framework import serializers
 
 from apps.equipment.models import Equipment, EquipmentStatus
 from apps.equipment.serializers import EquipmentSerializer
+from apps.common.photos import PhotoSerializerMixin, process_photo
 
 from .models import BorrowRequest
 from .services import check_equipment_availability
@@ -27,6 +28,11 @@ class ProviderRequestListFilterSerializer(serializers.Serializer):
 
 
 class ReturnConditionSerializer(serializers.Serializer):
+    photo = serializers.FileField(required=False, write_only=True)
+
+    def validate_photo(self, value):
+        return process_photo(value)
+
     return_condition = serializers.CharField(max_length=2000, allow_blank=False, trim_whitespace=True)
 
 
@@ -131,7 +137,7 @@ class BorrowRequestSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class ProviderBorrowRequestSerializer(serializers.ModelSerializer):
+class ProviderBorrowRequestSerializer(PhotoSerializerMixin, serializers.ModelSerializer):
     borrower = BorrowerSummarySerializer(read_only=True)
     equipment = EquipmentSerializer(read_only=True)
     decided_by = serializers.PrimaryKeyRelatedField(read_only=True)
@@ -143,6 +149,7 @@ class ProviderBorrowRequestSerializer(serializers.ModelSerializer):
             "borrower",
             "equipment",
             "pickup_date",
+            "photo_preview_url", "photo_original_url",
             "due_date",
             "purpose",
             "status",

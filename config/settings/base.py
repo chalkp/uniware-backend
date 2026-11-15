@@ -79,6 +79,9 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+MEDIA_ROOT = BASE_DIR / "media"
+PHOTO_UPLOAD_MAX_BYTES = 20 * 1024 * 1024
+PHOTO_MAX_PIXELS = 40_000_000
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

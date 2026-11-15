@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 
 from apps.common.permissions import IsProvider, IsAdmin
+from apps.common.photos import photo_atomic
 from .suspension import notify_equipment_change
 
 from .models import Category, Equipment, EquipmentStatus, EquipmentSuspensionNotice, Location
@@ -31,6 +32,14 @@ class EquipmentViewSet(
 
     serializer_class = EquipmentSerializer
 
+    @photo_atomic
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @photo_atomic
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update"):
             return [IsAuthenticated(), IsProvider()]
@@ -39,7 +48,7 @@ class EquipmentViewSet(
     def get_queryset(self):
         base = Equipment.objects.select_related("category", "location", "provider")
         if self.action in ("update", "partial_update"):
-            return base.filter(provider=self.request.user)
+            return base.filter(provider=self.request.user).select_for_update(of=("self",))
         queryset = base.visible_to_borrowers()
         if self.action == "list":
             filters = EquipmentCatalogFilterSerializer(data=self.request.query_params)

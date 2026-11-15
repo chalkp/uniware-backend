@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.accounts.models import User
+from apps.common.photos import PhotoSerializerMixin
 
 from .models import PROVIDER_SETTABLE_STATUSES, Category, Equipment, EquipmentStatus, Location
 
@@ -40,7 +41,7 @@ class EquipmentOwnerSerializer(serializers.ModelSerializer):
         return f"{user.first_name} {user.last_name}".strip() or user.email
 
 
-class EquipmentSerializer(serializers.ModelSerializer):
+class EquipmentSerializer(PhotoSerializerMixin, serializers.ModelSerializer):
     """US2-1/US2-3/US2-5: create/edit serializer, also used read-only for the catalog
     and provider-inventory views."""
 
@@ -67,6 +68,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
         model = Equipment
         fields = [
             "id",
+            "photo", "photo_preview_url", "photo_original_url",
             "asset_id",
             "name",
             "model",

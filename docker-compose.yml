@@ -17,6 +17,8 @@ services:
 
   api:
     build: .
+    volumes:
+      - uniware_media:/app/media
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.dev
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-only-insecure-secret-key-change-me}
@@ -34,4 +36,5 @@ services:
         condition: service_healthy
 
 volumes:
+  uniware_media:
   uniware_pgdata:

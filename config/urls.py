@@ -3,8 +3,10 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.accounts.views import ProfileView
+from apps.common.photo_views import PhotoView
 
 urlpatterns = [
+    path("api/photos/<str:resource>/<uuid:pk>/<str:variant>", PhotoView.as_view(), name="photo"),
     path("admin/", admin.site.urls),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
