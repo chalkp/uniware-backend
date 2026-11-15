@@ -1,8 +1,15 @@
+from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, mixins, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
+from apps.common.exceptions import BookingConflict
 from apps.common.permissions import IsProvider
+from apps.requests.models import BorrowRequest
 
 from .models import Category, Equipment, EquipmentStatus, Location
 from .serializers import (
@@ -25,14 +32,14 @@ class EquipmentViewSet(
     serializer_class = EquipmentSerializer
 
     def get_permissions(self):
-        if self.action in ("create", "update", "partial_update"):
+        if self.action in ("create", "update", "partial_update", "archive"):
             return [IsAuthenticated(), IsProvider()]
         return [IsAuthenticated()]
 
     def get_queryset(self):
         base = Equipment.objects.select_related("category", "location", "provider")
-        if self.action in ("update", "partial_update"):
-            return base.filter(provider=self.request.user)
+        if self.action in ("update", "partial_update", "archive"):
+            return base.filter(provider=self.request.user).select_for_update(of=("self",))
         queryset = base.visible_to_borrowers()
         if self.action == "list":
             filters = EquipmentCatalogFilterSerializer(data=self.request.query_params)
@@ -54,6 +61,42 @@ class EquipmentViewSet(
 
     def perform_create(self, serializer):
         serializer.save(provider=self.request.user)
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+
+    @extend_schema(
+        summary="Archive equipment owned by the current provider",
+        request=None,
+        responses={200: EquipmentSerializer},
+        description=(
+            "Retains the equipment and request history but hides it from borrowers. "
+            "Returns 404 for another owner's equipment and 409 for active reservations or loans. "
+            "Repeated archive calls preserve the original archived_at timestamp."
+        ),
+    )
+    @action(detail=True, methods=["post"], url_path="archive")
+    @transaction.atomic
+    def archive(self, request, pk=None):
+        equipment = self.get_object()
+        if equipment.status == EquipmentStatus.ARCHIVED:
+            return Response(self.get_serializer(equipment).data)
+
+        if equipment.status in (EquipmentStatus.RESERVED, EquipmentStatus.CHECKED_OUT) or (
+            equipment.borrow_requests.filter(
+                status__in=(
+                    BorrowRequest.StatusChoices.APPROVED,
+                    BorrowRequest.StatusChoices.CHECKED_OUT,
+                )
+            ).exists()
+        ):
+            raise BookingConflict("Equipment with an active reservation or loan cannot be archived.")
+
+        equipment.status = EquipmentStatus.ARCHIVED
+        equipment.archived_at = timezone.now()
+        equipment.save(update_fields=["status", "archived_at", "updated_at"])
+        return Response(self.get_serializer(equipment).data)
 
 
 class ProviderEquipmentListView(generics.ListAPIView):
