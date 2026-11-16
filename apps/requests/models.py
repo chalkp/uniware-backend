@@ -11,7 +11,8 @@ class BorrowRequest(models.Model):
         REJECTED = "REJECTED", "Rejected"
         CANCELLED = "CANCELLED", "Cancelled"
         CHECKED_OUT = "CHECKED_OUT", "Checked Out"
-        COMPLETED = "COMPLETED", "Completed"
+        RETURNED = "RETURNED", "Returned"
+        COMPLETED = "COMPLETED", "Completed"  # Legacy requests
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
@@ -36,6 +37,8 @@ class BorrowRequest(models.Model):
     status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.PENDING)
     decision_reason = models.TextField(blank=True, default="")
     decided_at = models.DateTimeField(null=True, blank=True)
+    return_condition = models.TextField(blank=True, default="")
+    returned_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [

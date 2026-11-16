@@ -65,7 +65,7 @@ def test_provider_can_retrieve_only_requests_for_owned_equipment(
     assert foreign_response.status_code == 404
 
 
-def test_provider_list_requires_active_provider(api_client, auth_client, borrower, provider):
+def test_provider_list_requires_active_provider(api_client, borrower, provider):
     suspended_provider = provider
     suspended_provider.account_status = AccountStatus.SUSPENDED
     suspended_provider.save(update_fields=["account_status"])
@@ -73,7 +73,8 @@ def test_provider_list_requires_active_provider(api_client, auth_client, borrowe
     assert api_client.get(provider_request_url()).status_code == 401
     api_client.force_authenticate(user=borrower)
     assert api_client.get(provider_request_url()).status_code == 403
-    assert auth_client(suspended_provider).get(provider_request_url()).status_code == 403
+    api_client.force_authenticate(user=suspended_provider)
+    assert api_client.get(provider_request_url()).status_code == 403
 
 
 def test_provider_approval_records_decision_and_reserves_requested_period(auth_client, borrower, provider):

@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.accounts.models import User
 from apps.common.exceptions import InvalidStateTransition
 
 from .models import PROVIDER_SETTABLE_STATUSES, Category, Equipment, EquipmentStatus, Location
@@ -26,6 +27,20 @@ class LocationSerializer(serializers.ModelSerializer):
         fields = ["id", "name"]
 
 
+class EquipmentOwnerSerializer(serializers.ModelSerializer):
+    """Read-only provider contact details for the authenticated equipment catalog."""
+
+    name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["name", "email", "department"]
+        read_only_fields = fields
+
+    def get_name(self, user):
+        return f"{user.first_name} {user.last_name}".strip() or user.email
+
+
 class EquipmentSerializer(serializers.ModelSerializer):
     """US2-1/US2-3/US2-5: create/edit serializer, also used read-only for the catalog
     and provider-inventory views."""
@@ -38,7 +53,11 @@ class EquipmentSerializer(serializers.ModelSerializer):
     location_id = serializers.PrimaryKeyRelatedField(
         source="location", queryset=Location.objects.all(), write_only=True
     )
-    provider = serializers.PrimaryKeyRelatedField(read_only=True)
+    provider = serializers.UUIDField(source="provider_id", read_only=True)
+    owner = EquipmentOwnerSerializer(source="provider", read_only=True)
+    admin_suspended = serializers.BooleanField(read_only=True)
+    is_suspended = serializers.BooleanField(read_only=True)
+    suspension_reason = serializers.CharField(read_only=True)
     status = serializers.ChoiceField(
         choices=[(s.value, s.label) for s in PROVIDER_SETTABLE_STATUSES],
         default=EquipmentStatus.AVAILABLE,
@@ -59,14 +78,38 @@ class EquipmentSerializer(serializers.ModelSerializer):
             "model",
             "description",
             "provider",
+            "owner",
             "category",
             "location",
             "category_id",
             "location_id",
             "status",
+            "admin_suspended",
+            "is_suspended",
+            "suspension_reason",
             "archived_at",
             "disabled_at",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "provider", "archived_at", "disabled_at", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "provider",
+            "owner",
+            "is_suspended",
+            "suspension_reason",
+            "archived_at",
+            "disabled_at",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class EquipmentSuspensionUpdateSerializer(serializers.Serializer):
+    is_suspended = serializers.BooleanField()
+    reason = serializers.CharField(max_length=1000, trim_whitespace=True, allow_blank=True, required=False)
+
+    def validate(self, attrs):
+        if attrs["is_suspended"] and not attrs.get("reason", "").strip():
+            raise serializers.ValidationError({"reason": "A suspension reason is required."})
+        return attrs
