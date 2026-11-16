@@ -40,10 +40,7 @@ def test_admin_hold_blocks_new_requests_approval_and_checkout_but_preserves_hist
     assert result.data["suspension_reason"] == "Safety inspection"
     assert result.data["status"] == EquipmentStatus.AVAILABLE
     assert auth_client(provider).post(f"/api/provider/requests/{pending.id}/approve").status_code == 409
-    assert (
-        auth_client(provider).post(f"/api/provider/requests/{approved.id}/checkout").status_code
-        == 409
-    )
+    assert auth_client(provider).post(f"/api/provider/requests/{approved.id}/checkout").status_code == 409
     create = auth_client(borrower).post(
         "/api/requests/borrow-requests/",
         {
