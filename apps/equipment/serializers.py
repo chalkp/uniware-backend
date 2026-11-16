@@ -52,7 +52,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
     location_id = serializers.PrimaryKeyRelatedField(
         source="location", queryset=Location.objects.all(), write_only=True
     )
-    provider = serializers.PrimaryKeyRelatedField(read_only=True)
+    provider = serializers.UUIDField(source="provider_id", read_only=True)
     owner = EquipmentOwnerSerializer(source="provider", read_only=True)
     admin_suspended = serializers.BooleanField(read_only=True)
     is_suspended = serializers.BooleanField(read_only=True)
