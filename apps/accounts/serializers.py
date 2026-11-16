@@ -185,6 +185,13 @@ class UserRoleUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = ["is_admin", "is_provider", "is_borrower"]
 
+    def to_internal_value(self, data):
+        if not isinstance(data, Mapping) or set(data) - set(self.fields):
+            raise serializers.ValidationError({"roles": "Supply only supported role fields."})
+        if any(type(value) is not bool for value in data.values()):
+            raise serializers.ValidationError({"roles": "Role values must be booleans."})
+        return super().to_internal_value(data)
+
     def validate(self, attrs):
         if not any(key in attrs for key in self.fields):
             raise serializers.ValidationError("At least one role must be supplied.")

@@ -3,6 +3,7 @@ from django.contrib.auth import login as django_login
 from django.contrib.auth import logout as django_logout
 from django.contrib.sessions.models import Session
 from django.db import transaction
+from django.db.models import Q
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -12,6 +13,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.common.pagination import StandardPageNumberPagination
 from apps.common.permissions import IsAdmin
 from apps.equipment.models import Equipment
 from apps.equipment.suspension import notify_equipment_change
@@ -126,7 +128,14 @@ class UserManagementView(APIView):
 
     def get(self, request):
         users = User.objects.all().order_by("email")
-        return Response(UserSerializer(users, many=True).data)
+        search = request.query_params.get("search", "").strip()
+        for word in search.split():
+            users = users.filter(
+                Q(email__icontains=word) | Q(first_name__icontains=word) | Q(last_name__icontains=word)
+            )
+        paginator = StandardPageNumberPagination()
+        page = paginator.paginate_queryset(users, request)
+        return paginator.get_paginated_response(UserSerializer(page, many=True).data)
 
     def patch(self, request, user_id):
         target = get_object_or_404(User, id=user_id)

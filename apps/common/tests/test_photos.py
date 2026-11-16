@@ -247,3 +247,24 @@ def test_archived_equipment_cannot_replace_photo(api_client, provider, private_m
     assert equipment.status == "ARCHIVED"
     assert equipment.photo_original == equipment.photo_preview == ""
     assert not [path for path in private_media.rglob("*") if path.is_file()]
+
+
+def test_provider_handover_then_photo_return_preserves_audit(api_client, provider, borrower):
+    record = loan(borrower, provider)
+    record.status = "APPROVED"
+    record.save(update_fields=["status"])
+    record.equipment.status = "AVAILABLE"
+    record.equipment.save(update_fields=["status"])
+    api_client.force_authenticate(provider)
+    checkout = api_client.post(f"/api/provider/requests/{record.pk}/checkout", {}, format="json")
+    assert checkout.status_code == 200
+    audit = checkout.data["checkout_record"]
+    assert audit["handover_person"]["id"] == str(provider.pk)
+    returned = api_client.post(
+        f"/api/provider/requests/{record.pk}/return",
+        {"return_condition": "Good", "photo": upload()},
+        format="multipart",
+    )
+    assert returned.status_code == 200
+    assert returned.data["checkout_record"] == audit
+    assert api_client.get(returned.data["photo_original_url"]).status_code == 200

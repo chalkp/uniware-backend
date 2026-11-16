@@ -1,8 +1,9 @@
 from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
-from rest_framework import mixins, status, viewsets
+from rest_framework import generics, mixins, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -12,7 +13,7 @@ from apps.common.permissions import IsProvider
 from apps.common.photos import photo_atomic, save_photo
 from apps.equipment.models import Equipment, EquipmentStatus
 
-from .models import BorrowRequest
+from .models import BorrowRequest, Checkout
 from .serializers import (
     BorrowRequestSerializer,
     ProviderBorrowRequestSerializer,
@@ -151,30 +152,7 @@ class BorrowRequestViewSet(
     @action(detail=True, methods=["post"], url_path="checkout")
     @transaction.atomic
     def checkout(self, request, pk=None):
-        """Only the borrower can confirm possession of their approved equipment."""
-        borrow_request = self.get_object()
-        if borrow_request.status != BorrowRequest.StatusChoices.APPROVED:
-            raise InvalidStateTransition("Only approved requests can be checked out.")
-        if borrow_request.pickup_date < timezone.localdate():
-            raise InvalidStateTransition(
-                "The pickup date has passed. Arrange a new request with updated dates."
-            )
-
-        equipment = (
-            Equipment.objects.select_related("provider")
-            .select_for_update()
-            .get(pk=borrow_request.equipment_id)
-        )
-        if equipment.is_suspended:
-            raise InvalidStateTransition("Suspended equipment cannot be checked out.")
-        if equipment.status not in (EquipmentStatus.AVAILABLE, EquipmentStatus.RESERVED):
-            raise BookingConflict("Equipment cannot be checked out in its current state.")
-        borrow_request.status = BorrowRequest.StatusChoices.CHECKED_OUT
-        borrow_request.save(update_fields=["status"])
-        equipment.status = EquipmentStatus.CHECKED_OUT
-        equipment.save(update_fields=["status", "updated_at"])
-        borrow_request.refresh_from_db()
-        return Response(self.get_serializer(borrow_request).data)
+        raise PermissionDenied("Only the equipment provider can confirm handover.")
 
 
 class IsActiveProvider(IsProvider):
@@ -212,7 +190,7 @@ class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMi
             "equipment__location",
             "decided_by",
         )
-        if self.action in ("approve", "reject", "mark_returned"):
+        if self.action in ("approve", "reject", "mark_returned", "checkout"):
             queryset = queryset.select_for_update(of=("self",))
         return queryset.order_by("pickup_date", "id")
 
@@ -229,6 +207,53 @@ class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMi
         if page is not None:
             return self.get_paginated_response(self.get_serializer(page, many=True).data)
         return Response(self.get_serializer(queryset, many=True).data)
+
+    @action(detail=False, methods=["get"], url_path="ready-for-pickup")
+    def ready_for_pickup(self, request):
+        queryset = self.get_queryset().filter(
+            status=BorrowRequest.StatusChoices.APPROVED,
+            pickup_date__gte=timezone.localdate(),
+            borrower__is_active=True,
+            borrower__account_status=AccountStatus.ACTIVE,
+            equipment__status__in=(EquipmentStatus.AVAILABLE, EquipmentStatus.RESERVED),
+            equipment__admin_suspended=False,
+            equipment__disabled_at__isnull=True,
+            checkout_record__isnull=True,
+        )
+        page = self.paginate_queryset(queryset)
+        return self.get_paginated_response(self.get_serializer(page, many=True).data)
+
+    @action(detail=True, methods=["post"], url_path="checkout")
+    @transaction.atomic
+    def checkout(self, request, pk=None):
+        if request.data:
+            raise ValidationError(
+                "Handover timestamp and actor are assigned by the server; send an empty object."
+            )
+        borrow_request = self.get_object()
+        if borrow_request.status != BorrowRequest.StatusChoices.APPROVED:
+            raise InvalidStateTransition("Only approved requests can be checked out.")
+        borrower = User.objects.select_for_update().get(pk=borrow_request.borrower_id)
+        if not borrower.is_active or borrower.account_status != AccountStatus.ACTIVE:
+            raise InvalidStateTransition("Suspended borrowers cannot collect equipment.")
+        if borrow_request.pickup_date < timezone.localdate():
+            raise InvalidStateTransition(
+                "The pickup date has passed. Arrange a new request with updated dates."
+            )
+        equipment = Equipment.objects.select_for_update().get(pk=borrow_request.equipment_id)
+        if equipment.is_suspended:
+            raise InvalidStateTransition("Suspended equipment cannot be checked out.")
+        if equipment.status not in (EquipmentStatus.AVAILABLE, EquipmentStatus.RESERVED):
+            raise BookingConflict("Equipment cannot be checked out in its current state.")
+        if Checkout.objects.filter(request=borrow_request).exists():
+            raise InvalidStateTransition("This request already has a handover record.")
+        Checkout.objects.create(request=borrow_request, handover_person=request.user)
+        borrow_request.status = BorrowRequest.StatusChoices.CHECKED_OUT
+        borrow_request.save(update_fields=["status"])
+        equipment.status = EquipmentStatus.CHECKED_OUT
+        equipment.save(update_fields=["status", "updated_at"])
+        borrow_request.refresh_from_db()
+        return Response(self.get_serializer(borrow_request).data)
 
     @extend_schema(summary="Approve a pending request for my equipment")
     @action(detail=True, methods=["post"], url_path="approve")
@@ -305,3 +330,25 @@ class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMi
             equipment.save(update_fields=["status", "updated_at"])
         borrow_request.refresh_from_db()
         return Response(self.get_serializer(borrow_request).data)
+
+
+class MyActiveLoansView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = BorrowRequestSerializer
+
+    def get_queryset(self):
+        if self.request.query_params.get("status", "active") != "active":
+            raise ValidationError({"status": "Only active loans are supported."})
+        return (
+            BorrowRequest.objects.filter(
+                borrower=self.request.user, status=BorrowRequest.StatusChoices.CHECKED_OUT
+            )
+            .select_related(
+                "equipment",
+                "equipment__provider",
+                "equipment__category",
+                "equipment__location",
+                "checkout_record__handover_person",
+            )
+            .order_by("due_date", "id")
+        )

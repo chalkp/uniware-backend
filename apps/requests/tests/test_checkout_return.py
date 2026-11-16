@@ -30,12 +30,12 @@ def provider_url(req, action="return"):
     return f"/api/provider/requests/{req.id}/{action}"
 
 
-def test_borrower_checkout_then_provider_return_roundtrip(auth_client, borrower, provider):
+def test_provider_checkout_then_return_roundtrip(auth_client, borrower, provider):
     req, equipment = request_for(borrower, provider)
     borrower_client = auth_client(borrower)
     provider_client = auth_client(provider)
 
-    checkout = borrower_client.post(borrower_url(req))
+    checkout = provider_client.post(provider_url(req, "checkout"))
     req.refresh_from_db()
     equipment.refresh_from_db()
     assert checkout.status_code == 200
@@ -67,7 +67,7 @@ def test_borrower_checkout_then_provider_return_roundtrip(auth_client, borrower,
 
 def test_pending_cannot_checkout(auth_client, borrower, provider):
     req, equipment = request_for(borrower, provider, BorrowRequest.StatusChoices.PENDING)
-    response = auth_client(borrower).post(borrower_url(req))
+    response = auth_client(provider).post(provider_url(req, "checkout"))
     assert response.status_code == 409
     req.refresh_from_db()
     equipment.refresh_from_db()
@@ -77,7 +77,7 @@ def test_pending_cannot_checkout(auth_client, borrower, provider):
 
 def test_borrower_cannot_checkout_others_request(auth_client, borrower, provider, other_provider):
     req, _ = request_for(borrower, provider)
-    assert auth_client(other_provider).post(borrower_url(req)).status_code == 404
+    assert auth_client(other_provider).post(borrower_url(req)).status_code == 403
 
 
 def test_provider_cannot_return_request_for_someone_elses_equipment(
@@ -114,7 +114,7 @@ def test_checkout_rejects_unavailable_inventory(auth_client, borrower, provider)
     req, equipment = request_for(borrower, provider)
     equipment.status = EquipmentStatus.MAINTENANCE
     equipment.save(update_fields=["status"])
-    assert auth_client(borrower).post(borrower_url(req)).status_code == 409
+    assert auth_client(provider).post(provider_url(req, "checkout")).status_code == 409
     req.refresh_from_db()
     assert req.status == BorrowRequest.StatusChoices.APPROVED
 
