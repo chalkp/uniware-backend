@@ -62,3 +62,5 @@ and transactional photo cleanup are both retained.
 ## Up to three equipment photos
 
 Equipment create/update accepts multipart `photo`, `photo_2`, and `photo_3` for slots 1–3. Each supplied slot replaces only that slot; omitted slots remain unchanged. Supplying a numbered slot above 3 returns 400. Equipment responses include `photos`, an ordered list of `{slot, preview_url, original_url}` for occupied slots; the existing `photo_preview_url` and `photo_original_url` still refer to slot 1. Each URL uses the same visibility and authentication rules and each upload has the same processing limits. Return records continue to support one photo.
+
+To delete equipment photos, send `remove_photos` with slot numbers 1–3 in a provider-owned equipment PATCH. In multipart requests, repeat `remove_photos` for each slot; JSON arrays are also supported. A slot cannot be replaced and removed in the same request. File deletion is scheduled after the database transaction commits.

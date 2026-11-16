@@ -1,8 +1,9 @@
+from django.db import transaction
 from rest_framework import serializers
 
 from apps.accounts.models import User
 from apps.common.exceptions import InvalidStateTransition
-from apps.common.photos import PhotoSerializerMixin, process_photo, save_photo
+from apps.common.photos import PhotoSerializerMixin, delete_files, process_photo, save_photo
 
 from .models import PROVIDER_SETTABLE_STATUSES, Category, Equipment, EquipmentStatus, Location
 
@@ -49,6 +50,9 @@ class EquipmentSerializer(PhotoSerializerMixin, serializers.ModelSerializer):
     photo_2 = serializers.FileField(write_only=True, required=False)
     photo_3 = serializers.FileField(write_only=True, required=False)
     photos = serializers.SerializerMethodField()
+    remove_photos = serializers.ListField(
+        child=serializers.IntegerField(min_value=1, max_value=3), required=False, write_only=True
+    )
 
     def to_internal_value(self, data):
         if any(
@@ -81,6 +85,7 @@ class EquipmentSerializer(PhotoSerializerMixin, serializers.ModelSerializer):
         return result
 
     def create(self, validated_data):
+        validated_data.pop("remove_photos", None)
         extra = [(slot, validated_data.pop(f"photo_{slot}", None)) for slot in (2, 3)]
         instance = super().create(validated_data)
         for slot, photo in extra:
@@ -89,6 +94,18 @@ class EquipmentSerializer(PhotoSerializerMixin, serializers.ModelSerializer):
         return instance
 
     def update(self, instance, validated_data):
+        removed = validated_data.pop("remove_photos", [])
+        for slot in removed:
+            field = "photo" if slot == 1 else f"photo_{slot}"
+            if ("photo" if slot == 1 else f"photo_{slot}") in validated_data:
+                raise serializers.ValidationError(
+                    {"remove_photos": "Cannot remove and replace the same photo."}
+                )
+            names = [getattr(instance, f"{field}_original"), getattr(instance, f"{field}_preview")]
+            setattr(instance, f"{field}_original", "")
+            setattr(instance, f"{field}_preview", "")
+            instance.save(update_fields=[f"{field}_original", f"{field}_preview"])
+            transaction.on_commit(lambda names=names: delete_files(names))
         extra = [(slot, validated_data.pop(f"photo_{slot}", None)) for slot in (2, 3)]
         instance = super().update(instance, validated_data)
         for slot, photo in extra:
@@ -128,6 +145,7 @@ class EquipmentSerializer(PhotoSerializerMixin, serializers.ModelSerializer):
             "photo_2",
             "photo_3",
             "photos",
+            "remove_photos",
             "photo_preview_url",
             "photo_original_url",
             "asset_id",

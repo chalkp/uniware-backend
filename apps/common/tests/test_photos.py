@@ -298,3 +298,21 @@ def test_equipment_three_photos_replace_and_limit(api_client, provider, borrower
     item.refresh_from_db()
     assert item.photo_2_original != original
     assert len(result.data["photos"]) == 3
+
+
+def test_owner_can_delete_a_single_photo_slot(api_client, provider, borrower):
+    item = EquipmentFactory(provider=provider)
+    api_client.force_authenticate(provider)
+    url = f"/api/equipment/{item.pk}"
+    added = api_client.patch(
+        url, {"photo": upload(size=(30, 30)), "photo_2": upload(size=(30, 30))}, format="multipart"
+    )
+    assert added.status_code == 200
+    photo_url = added.data["photos"][0]["original_url"]
+    api_client.force_authenticate(borrower)
+    assert api_client.patch(url, {"remove_photos": [1]}, format="json").status_code == 403
+    api_client.force_authenticate(provider)
+    result = api_client.patch(url, {"remove_photos": ["1"]}, format="multipart")
+    assert result.status_code == 200, result.data
+    assert [photo["slot"] for photo in result.data["photos"]] == [2]
+    assert api_client.get(photo_url).status_code == 404
