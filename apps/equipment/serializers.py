@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.accounts.models import User
+from apps.common.exceptions import InvalidStateTransition
 
 from .models import PROVIDER_SETTABLE_STATUSES, Category, Equipment, EquipmentStatus, Location
 
@@ -62,6 +63,11 @@ class EquipmentSerializer(serializers.ModelSerializer):
         default=EquipmentStatus.AVAILABLE,
         required=False,
     )
+
+    def validate(self, attrs):
+        if self.instance and self.instance.status == EquipmentStatus.ARCHIVED:
+            raise InvalidStateTransition("Archived equipment cannot be edited or restored.")
+        return attrs
 
     class Meta:
         model = Equipment
