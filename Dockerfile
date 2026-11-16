@@ -5,14 +5,14 @@
 # building on ghcr.io/astral-sh/uv's image and copying .venv into a plain python:3.12
 # runtime silently resolves to the runtime's *system* interpreter (no venv, no
 # dependencies) instead of failing loudly — pulling in only the uv binary avoids that.
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.15-slim-bookworm AS builder
 COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /usr/local/bin/uv
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.15-slim-bookworm AS runtime
 RUN addgroup --system uniware && adduser --system --ingroup uniware --home /app uniware
 WORKDIR /app
 ENV PATH="/app/.venv/bin:$PATH" \
