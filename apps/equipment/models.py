@@ -50,7 +50,13 @@ PROVIDER_SETTABLE_STATUSES = [EquipmentStatus.AVAILABLE, EquipmentStatus.MAINTEN
 
 class EquipmentQuerySet(models.QuerySet):
     def visible_to_borrowers(self):
-        return self.filter(status__in=VISIBLE_TO_BORROWERS)
+        return self.filter(
+            status__in=VISIBLE_TO_BORROWERS,
+            admin_suspended=False,
+            disabled_at__isnull=True,
+            provider__account_status="ACTIVE",
+            provider__is_active=True,
+        )
 
 
 class Equipment(TimeStampedModel):
@@ -85,11 +91,16 @@ class Equipment(TimeStampedModel):
     @property
     def is_suspended(self):
         return (
-            self.admin_suspended or self.provider.account_status == "SUSPENDED" or not self.provider.is_active
+            self.disabled_at is not None
+            or self.admin_suspended
+            or self.provider.account_status == "SUSPENDED"
+            or not self.provider.is_active
         )
 
     @property
     def suspension_reason(self):
+        if self.disabled_at is not None:
+            return self.disabled_reason
         if self.admin_suspended:
             return self.admin_suspension_reason
         if self.provider.account_status == "SUSPENDED" or not self.provider.is_active:

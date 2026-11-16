@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    AdminEquipmentDisableView,
     AdminEquipmentListView,
     AdminEquipmentSuspensionView,
     CategoryListView,
@@ -15,6 +16,11 @@ router = DefaultRouter(trailing_slash=False)
 router.register("equipment", EquipmentViewSet, basename="equipment")
 
 urlpatterns = [
+    path(
+        "admin/equipment/<uuid:equipment_id>/disable",
+        AdminEquipmentDisableView.as_view(),
+        name="admin-equipment-disable",
+    ),
     path("admin/equipment", AdminEquipmentListView.as_view(), name="admin-equipment-list"),
     path(
         "admin/equipment/<uuid:equipment_id>/suspension",

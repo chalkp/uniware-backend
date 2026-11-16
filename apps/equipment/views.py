@@ -184,6 +184,24 @@ class AdminEquipmentSuspensionView(APIView):
         return Response(EquipmentSerializer(equipment).data, status=status.HTTP_200_OK)
 
 
+class AdminEquipmentDisableView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    @transaction.atomic
+    def post(self, request, equipment_id):
+        payload = EquipmentSuspensionUpdateSerializer(
+            data={"is_suspended": True, "reason": request.data.get("reason", "")}
+        )
+        payload.is_valid(raise_exception=True)
+        equipment = get_object_or_404(Equipment.objects.select_for_update(), pk=equipment_id)
+        # Keep the physical state so an existing loan can still be returned normally.
+        if equipment.disabled_at is None:
+            equipment.disabled_at = timezone.now()
+            equipment.disabled_reason = payload.validated_data["reason"]
+            equipment.save(update_fields=["disabled_at", "disabled_reason", "updated_at"])
+        return Response(EquipmentSerializer(equipment).data)
+
+
 class EquipmentNoticesView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     pagination_class = None
