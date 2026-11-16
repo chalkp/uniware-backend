@@ -14,7 +14,8 @@ class PhotoView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, resource, pk, variant):
-        if variant not in ("preview", "original"):
+        allowed = ("preview", "original", "preview-2", "original-2", "preview-3", "original-3")
+        if variant not in allowed or (resource != "equipment" and "-" in variant):
             raise Http404
         if resource == "equipment":
             queryset = Equipment.objects.visible_to_borrowers()
@@ -25,7 +26,9 @@ class PhotoView(APIView):
         else:
             raise Http404
         obj = get_object_or_404(queryset, pk=pk)
-        name = getattr(obj, f"photo_{variant}")
+        kind, _, slot = variant.partition("-")
+        prefix = f"photo_{slot}" if slot else "photo"
+        name = getattr(obj, f"{prefix}_{kind}")
         if not name:
             raise Http404
         try:

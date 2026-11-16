@@ -268,3 +268,33 @@ def test_provider_handover_then_photo_return_preserves_audit(api_client, provide
     assert returned.status_code == 200
     assert returned.data["checkout_record"] == audit
     assert api_client.get(returned.data["photo_original_url"]).status_code == 200
+
+
+def test_equipment_three_photos_replace_and_limit(api_client, provider, borrower, other_provider):
+    item = EquipmentFactory(provider=provider)
+    api_client.force_authenticate(provider)
+    url = f"/api/equipment/{item.pk}"
+    result = api_client.patch(
+        url,
+        {"photo": upload(size=(30, 30)), "photo_2": upload(size=(30, 30)), "photo_3": upload(size=(30, 30))},
+        format="multipart",
+    )
+    assert result.status_code == 200, result.data
+    photos = result.data["photos"]
+    assert [photo["slot"] for photo in photos] == [1, 2, 3]
+    assert result.data["photo_original_url"] == photos[0]["original_url"]
+    item.refresh_from_db()
+    original = item.photo_2_original
+    api_client.force_authenticate(borrower)
+    for photo in photos:
+        assert api_client.get(photo["preview_url"]).status_code == 200
+        assert api_client.get(photo["original_url"]).status_code == 200
+    api_client.force_authenticate(other_provider)
+    assert api_client.patch(url, {"photo_2": upload(size=(30, 30))}, format="multipart").status_code == 404
+    api_client.force_authenticate(provider)
+    assert api_client.patch(url, {"photo_4": upload(size=(30, 30))}, format="multipart").status_code == 400
+    result = api_client.patch(url, {"photo_2": upload(size=(30, 30))}, format="multipart")
+    assert result.status_code == 200
+    item.refresh_from_db()
+    assert item.photo_2_original != original
+    assert len(result.data["photos"]) == 3

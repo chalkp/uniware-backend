@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from apps.accounts.models import User
 from apps.common.exceptions import InvalidStateTransition
-from apps.common.photos import PhotoSerializerMixin
+from apps.common.photos import PhotoSerializerMixin, process_photo, save_photo
 
 from .models import PROVIDER_SETTABLE_STATUSES, Category, Equipment, EquipmentStatus, Location
 
@@ -46,6 +46,56 @@ class EquipmentSerializer(PhotoSerializerMixin, serializers.ModelSerializer):
     """US2-1/US2-3/US2-5: create/edit serializer, also used read-only for the catalog
     and provider-inventory views."""
 
+    photo_2 = serializers.FileField(write_only=True, required=False)
+    photo_3 = serializers.FileField(write_only=True, required=False)
+    photos = serializers.SerializerMethodField()
+
+    def to_internal_value(self, data):
+        if any(
+            key.startswith("photo_") and key[6:].isdigit() and key not in ("photo_2", "photo_3")
+            for key in data
+        ):
+            raise serializers.ValidationError({"photos": "Equipment supports at most three photos."})
+        return super().to_internal_value(data)
+
+    def validate_photo_2(self, value):
+        return process_photo(value)
+
+    def validate_photo_3(self, value):
+        return process_photo(value)
+
+    def get_photos(self, obj):
+        result = []
+        for slot in (1, 2, 3):
+            prefix = "photo" if slot == 1 else f"photo_{slot}"
+            if getattr(obj, f"{prefix}_original"):
+                base = f"/api/photos/equipment/{obj.pk}"
+                suffix = "" if slot == 1 else f"-{slot}"
+                result.append(
+                    {
+                        "slot": slot,
+                        "preview_url": f"{base}/preview{suffix}",
+                        "original_url": f"{base}/original{suffix}",
+                    }
+                )
+        return result
+
+    def create(self, validated_data):
+        extra = [(slot, validated_data.pop(f"photo_{slot}", None)) for slot in (2, 3)]
+        instance = super().create(validated_data)
+        for slot, photo in extra:
+            if photo is not None:
+                save_photo(instance, photo, slot)
+        return instance
+
+    def update(self, instance, validated_data):
+        extra = [(slot, validated_data.pop(f"photo_{slot}", None)) for slot in (2, 3)]
+        instance = super().update(instance, validated_data)
+        for slot, photo in extra:
+            if photo is not None:
+                save_photo(instance, photo, slot)
+        return instance
+
     category = CategorySerializer(read_only=True)
     location = LocationSerializer(read_only=True)
     category_id = serializers.PrimaryKeyRelatedField(
@@ -75,6 +125,9 @@ class EquipmentSerializer(PhotoSerializerMixin, serializers.ModelSerializer):
         fields = [
             "id",
             "photo",
+            "photo_2",
+            "photo_3",
+            "photos",
             "photo_preview_url",
             "photo_original_url",
             "asset_id",

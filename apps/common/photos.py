@@ -123,21 +123,25 @@ def process_photo(upload):
         ) from exc
 
 
-def save_photo(instance, processed):
+def save_photo(instance, processed, slot=1):
     original, preview, extension = processed
-    old = [instance.photo_original, instance.photo_preview]
+    prefix = "photo" if slot == 1 else f"photo_{slot}"
+    original_field, preview_field = f"{prefix}_original", f"{prefix}_preview"
+    old = [getattr(instance, original_field), getattr(instance, preview_field)]
     names = _uploads.get()
     if names is None:
         raise RuntimeError("Photo writes require photo_atomic")
     key = f"photos/{uuid4().hex}"
     try:
-        instance.photo_original = default_storage.save(f"{key}/original{extension}", ContentFile(original))
-        names.append(instance.photo_original)
-        instance.photo_preview = default_storage.save(f"{key}/preview.webp", ContentFile(preview))
-        names.append(instance.photo_preview)
+        original_name = default_storage.save(f"{key}/original{extension}", ContentFile(original))
+        names.append(original_name)
+        preview_name = default_storage.save(f"{key}/preview.webp", ContentFile(preview))
+        names.append(preview_name)
+        setattr(instance, original_field, original_name)
+        setattr(instance, preview_field, preview_name)
     except OSError as exc:
         raise APIException("Photo storage failed. Please retry or remove the attachment.") from exc
-    instance.save(update_fields=["photo_original", "photo_preview"])
+    instance.save(update_fields=[original_field, preview_field])
     transaction.on_commit(lambda: delete_files(old))
 
 
