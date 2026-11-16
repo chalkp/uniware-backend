@@ -15,7 +15,7 @@ User = get_user_model()
 class BorrowerSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "email", "first_name", "last_name", "department"]
+        fields = ["id", "email", "first_name", "last_name", "department", "account_status"]
 
 
 class ProviderRequestListFilterSerializer(serializers.Serializer):
@@ -24,6 +24,10 @@ class ProviderRequestListFilterSerializer(serializers.Serializer):
         + (("ALL", "All"),),
         required=False,
     )
+
+
+class ReturnConditionSerializer(serializers.Serializer):
+    return_condition = serializers.CharField(max_length=2000, allow_blank=False, trim_whitespace=True)
 
 
 class RejectionReasonSerializer(serializers.Serializer):
@@ -56,6 +60,8 @@ class BorrowRequestSerializer(serializers.ModelSerializer):
             "decision_reason",
             "decided_by",
             "decided_at",
+            "return_condition",
+            "returned_at",
         ]
         read_only_fields = [
             "id",
@@ -64,6 +70,8 @@ class BorrowRequestSerializer(serializers.ModelSerializer):
             "decision_reason",
             "decided_by",
             "decided_at",
+            "return_condition",
+            "returned_at",
         ]
 
     def validate(self, attrs):
@@ -96,7 +104,15 @@ class BorrowRequestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"due_date": "due_date must be on or after pickup_date."})
 
         if equipment:
-            if getattr(equipment, "status", None) not in [
+            # Effective suspension blocks new requests and edits without changing the request status.
+            equipment = Equipment.objects.select_related("provider").get(pk=equipment.pk)
+            if equipment.is_suspended and (not self.instance or equipment.id != self.instance.equipment_id):
+                raise serializers.ValidationError(
+                    {"equipment_id": "This equipment is suspended and cannot be requested or edited."}
+                )
+            if (not self.instance or equipment.id != self.instance.equipment_id) and getattr(
+                equipment, "status", None
+            ) not in [
                 EquipmentStatus.AVAILABLE,
             ]:
                 raise serializers.ValidationError(
@@ -137,5 +153,7 @@ class ProviderBorrowRequestSerializer(serializers.ModelSerializer):
             "decision_reason",
             "decided_by",
             "decided_at",
+            "return_condition",
+            "returned_at",
         ]
         read_only_fields = fields
