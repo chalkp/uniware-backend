@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 
 from apps.common.exceptions import BookingConflict
 from apps.common.permissions import IsAdmin, IsProvider
+from apps.common.photos import photo_atomic
 from apps.requests.models import BorrowRequest
 
 from .models import Category, Equipment, EquipmentStatus, EquipmentSuspensionNotice, Location
@@ -34,6 +35,14 @@ class EquipmentViewSet(
     """US2-1, US2-3, US3-1, US3-4"""
 
     serializer_class = EquipmentSerializer
+
+    @photo_atomic
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @photo_atomic
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
 
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update", "archive"):
@@ -75,10 +84,6 @@ class EquipmentViewSet(
 
     def perform_create(self, serializer):
         serializer.save(provider=self.request.user)
-
-    @transaction.atomic
-    def update(self, request, *args, **kwargs):
-        return super().update(request, *args, **kwargs)
 
     @extend_schema(
         summary="Archive equipment owned by the current provider",
@@ -182,6 +187,24 @@ class AdminEquipmentSuspensionView(APIView):
         if before != equipment.is_suspended:
             notify_equipment_change(equipment, equipment.is_suspended, reason=equipment.suspension_reason)
         return Response(EquipmentSerializer(equipment).data, status=status.HTTP_200_OK)
+
+
+class AdminEquipmentDisableView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    @transaction.atomic
+    def post(self, request, equipment_id):
+        payload = EquipmentSuspensionUpdateSerializer(
+            data={"is_suspended": True, "reason": request.data.get("reason", "")}
+        )
+        payload.is_valid(raise_exception=True)
+        equipment = get_object_or_404(Equipment.objects.select_for_update(), pk=equipment_id)
+        # Keep the physical state so an existing loan can still be returned normally.
+        if equipment.disabled_at is None:
+            equipment.disabled_at = timezone.now()
+            equipment.disabled_reason = payload.validated_data["reason"]
+            equipment.save(update_fields=["disabled_at", "disabled_reason", "updated_at"])
+        return Response(EquipmentSerializer(equipment).data)
 
 
 class EquipmentNoticesView(generics.ListAPIView):

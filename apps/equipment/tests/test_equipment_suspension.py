@@ -40,10 +40,7 @@ def test_admin_hold_blocks_new_requests_approval_and_checkout_but_preserves_hist
     assert result.data["suspension_reason"] == "Safety inspection"
     assert result.data["status"] == EquipmentStatus.AVAILABLE
     assert auth_client(provider).post(f"/api/provider/requests/{pending.id}/approve").status_code == 409
-    assert (
-        auth_client(borrower).post(f"/api/requests/borrow-requests/{approved.id}/checkout/").status_code
-        == 409
-    )
+    assert auth_client(provider).post(f"/api/provider/requests/{approved.id}/checkout").status_code == 409
     create = auth_client(borrower).post(
         "/api/requests/borrow-requests/",
         {
@@ -133,7 +130,7 @@ def test_suspending_owner_suspends_every_owned_item_and_reactivating_restores_on
     item.refresh_from_db()
     manual.refresh_from_db()
     assert item.is_suspended and manual.is_suspended
-    assert auth_client(borrower).get(f"/api/equipment/{item.id}").data["is_suspended"] is True
+    assert auth_client(borrower).get(f"/api/equipment/{item.id}").status_code == 404
     assert EquipmentSuspensionNotice.objects.filter(recipient=borrower, equipment=item).exists()
     assert (
         admin.patch(

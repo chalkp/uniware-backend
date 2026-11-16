@@ -33,6 +33,8 @@ class BorrowRequest(models.Model):
     pickup_date = models.DateField(help_text="Inclusive: first day of possession")
     due_date = models.DateField(help_text="Exclusive: handover-back day")
     purpose = models.TextField()
+    photo_original = models.CharField(max_length=255, blank=True, default="", editable=False)
+    photo_preview = models.CharField(max_length=255, blank=True, default="", editable=False)
 
     status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.PENDING)
     decision_reason = models.TextField(blank=True, default="")
@@ -50,3 +52,14 @@ class BorrowRequest(models.Model):
 
     def __str__(self):
         return f"Request {self.id} - {self.status}"
+
+
+class Checkout(models.Model):
+    """Immutable handover audit; lifecycle/return state remains on the request."""
+
+    request = models.OneToOneField(BorrowRequest, on_delete=models.PROTECT, related_name="checkout_record")
+    checkout_at = models.DateTimeField(auto_now_add=True, editable=False)
+    handover_person = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, editable=False)
+
+    def __str__(self):
+        return f"Handover for {self.request_id}"
