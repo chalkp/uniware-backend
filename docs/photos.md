@@ -53,8 +53,8 @@ All 15 photo tests passed. A local synthetic 4000x3000 noisy JPEG (12,023,490
 bytes) took 0.679 seconds to process and produced a 446,902-byte WebP preview.
 This is a single local measurement, not a production latency guarantee.
 
-The unchanged base branch has six failing tests, reproduced in an isolated
-worktree: a UUID/string assertion in catalog tests, four checkout tests whose
-borrower fixture password differs from the login helper, and a provider test
-attempting login after suspension. The earlier 100%-coverage test branch is not
-part of this base; full-suite coverage must be reconciled when integrating branches.
+The branch now includes master through `13ad05d`, including its archive workflow,
+consent implementation and corrections to the six previously failing base tests.
+The equipment migration merge joins the independent photo and notice migrations.
+Archived equipment cannot have its photos replaced; the existing archive guard
+and transactional photo cleanup are both retained.

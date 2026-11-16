@@ -236,3 +236,14 @@ def test_metadata_removal_preserves_unrotated_jpeg_pixels():
     original, _, _ = process_photo(file)
     with Image.open(BytesIO(original)) as result:
         assert result.tobytes() == pixels
+
+
+def test_archived_equipment_cannot_replace_photo(api_client, provider, private_media):
+    equipment = EquipmentFactory(provider=provider, status="ARCHIVED")
+    api_client.force_authenticate(provider)
+    result = api_client.patch(f"/api/equipment/{equipment.pk}", {"photo": upload()}, format="multipart")
+    assert result.status_code == 409
+    equipment.refresh_from_db()
+    assert equipment.status == "ARCHIVED"
+    assert equipment.photo_original == equipment.photo_preview == ""
+    assert not [path for path in private_media.rglob("*") if path.is_file()]

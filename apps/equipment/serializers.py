@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.accounts.models import User
+from apps.common.exceptions import InvalidStateTransition
 from apps.common.photos import PhotoSerializerMixin
 
 from .models import PROVIDER_SETTABLE_STATUSES, Category, Equipment, EquipmentStatus, Location
@@ -53,7 +54,7 @@ class EquipmentSerializer(PhotoSerializerMixin, serializers.ModelSerializer):
     location_id = serializers.PrimaryKeyRelatedField(
         source="location", queryset=Location.objects.all(), write_only=True
     )
-    provider = serializers.PrimaryKeyRelatedField(read_only=True)
+    provider = serializers.UUIDField(source="provider_id", read_only=True)
     owner = EquipmentOwnerSerializer(source="provider", read_only=True)
     admin_suspended = serializers.BooleanField(read_only=True)
     is_suspended = serializers.BooleanField(read_only=True)
@@ -63,6 +64,11 @@ class EquipmentSerializer(PhotoSerializerMixin, serializers.ModelSerializer):
         default=EquipmentStatus.AVAILABLE,
         required=False,
     )
+
+    def validate(self, attrs):
+        if self.instance and self.instance.status == EquipmentStatus.ARCHIVED:
+            raise InvalidStateTransition("Archived equipment cannot be edited or restored.")
+        return attrs
 
     class Meta:
         model = Equipment

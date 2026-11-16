@@ -44,7 +44,9 @@ def test_borrower_checkout_then_provider_return_roundtrip(auth_client, borrower,
     assert equipment.status == EquipmentStatus.CHECKED_OUT
     assert provider_client.get(f"/api/provider/requests/{req.id}").data["status"] == "CHECKED_OUT"
 
-    returned = provider_client.post(provider_url(req), {"return_condition": "  Good condition; complete accessories.  "}, format="json")
+    returned = provider_client.post(
+        provider_url(req), {"return_condition": "  Good condition; complete accessories.  "}, format="json"
+    )
     req.refresh_from_db()
     equipment.refresh_from_db()
     assert returned.status_code == 200
@@ -53,8 +55,13 @@ def test_borrower_checkout_then_provider_return_roundtrip(auth_client, borrower,
     assert returned.data["returned_at"] is not None
     assert req.status == BorrowRequest.StatusChoices.RETURNED
     assert equipment.status == EquipmentStatus.AVAILABLE
-    assert borrower_client.get(f"/api/requests/borrow-requests/{req.id}/").data["return_condition"] == "Good condition; complete accessories."
-    assert borrower_client.get("/api/requests/borrow-requests/mine/", {"status": "RETURNED"}).data["count"] == 1
+    assert (
+        borrower_client.get(f"/api/requests/borrow-requests/{req.id}/").data["return_condition"]
+        == "Good condition; complete accessories."
+    )
+    assert (
+        borrower_client.get("/api/requests/borrow-requests/mine/", {"status": "RETURNED"}).data["count"] == 1
+    )
     assert provider_client.get("/api/provider/requests", {"status": "RETURNED"}).data["count"] == 1
 
 
@@ -73,9 +80,13 @@ def test_borrower_cannot_checkout_others_request(auth_client, borrower, provider
     assert auth_client(other_provider).post(borrower_url(req)).status_code == 404
 
 
-def test_provider_cannot_return_request_for_someone_elses_equipment(auth_client, borrower, provider, other_provider):
+def test_provider_cannot_return_request_for_someone_elses_equipment(
+    auth_client, borrower, provider, other_provider
+):
     req, _ = request_for(borrower, provider, BorrowRequest.StatusChoices.CHECKED_OUT)
-    response = auth_client(other_provider).post(provider_url(req), {"return_condition": "Great"}, format="json")
+    response = auth_client(other_provider).post(
+        provider_url(req), {"return_condition": "Great"}, format="json"
+    )
     assert response.status_code == 404
 
 
@@ -111,9 +122,15 @@ def test_checkout_rejects_unavailable_inventory(auth_client, borrower, provider)
 def test_borrower_cannot_forge_return_metadata(auth_client, borrower, provider):
     req, _ = request_for(borrower, provider, BorrowRequest.StatusChoices.PENDING)
     client = auth_client(borrower)
-    response = client.patch(f"/api/requests/borrow-requests/{req.id}/", {
-        "purpose": "Updated", "status": "RETURNED", "return_condition": "Unapproved",
-    }, format="json")
+    response = client.patch(
+        f"/api/requests/borrow-requests/{req.id}/",
+        {
+            "purpose": "Updated",
+            "status": "RETURNED",
+            "return_condition": "Unapproved",
+        },
+        format="json",
+    )
     req.refresh_from_db()
     assert response.status_code == 200
     assert req.status == BorrowRequest.StatusChoices.PENDING
