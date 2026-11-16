@@ -1,7 +1,9 @@
 """Effective suspension and in-app notices for owners and affected borrowers."""
+
 from apps.accounts.models import AccountStatus
 from apps.requests.models import BorrowRequest
-from .models import Equipment, EquipmentSuspensionNotice
+
+from .models import EquipmentSuspensionNotice
 
 
 def owner_suspended(owner):
@@ -20,7 +22,9 @@ def notify_equipment_change(equipment, suspended, *, reason=""):
             status__in=(BorrowRequest.StatusChoices.PENDING, BorrowRequest.StatusChoices.APPROVED),
         ).values_list("borrower_id", flat=True)
     )
-    EquipmentSuspensionNotice.objects.bulk_create([
-        EquipmentSuspensionNotice(recipient_id=pk, equipment=equipment, message=message)
-        for pk in recipient_ids
-    ])
+    EquipmentSuspensionNotice.objects.bulk_create(
+        [
+            EquipmentSuspensionNotice(recipient_id=pk, equipment=equipment, message=message)
+            for pk in recipient_ids
+        ]
+    )

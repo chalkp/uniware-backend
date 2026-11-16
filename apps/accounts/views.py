@@ -1,27 +1,32 @@
 from django.contrib.auth import SESSION_KEY, authenticate
-from django.db import transaction
-from django.shortcuts import get_object_or_404
 from django.contrib.auth import login as django_login
 from django.contrib.auth import logout as django_logout
 from django.contrib.sessions.models import Session
-from django.utils import timezone
+from django.db import transaction
 from django.middleware.csrf import get_token
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .exceptions import InvalidCredentials
-from .serializers import (
-    LoginSerializer, ProfileSerializer, RegisterSerializer, UserSerializer,
-    UserRoleUpdateSerializer, UserStatusUpdateSerializer,
-)
-
 from apps.common.permissions import IsAdmin
 from apps.equipment.models import Equipment
 from apps.equipment.suspension import notify_equipment_change
+
+from .exceptions import InvalidCredentials
 from .models import AccountStatus, User
+from .serializers import (
+    LoginSerializer,
+    ProfileSerializer,
+    RegisterSerializer,
+    UserRoleUpdateSerializer,
+    UserSerializer,
+    UserStatusUpdateSerializer,
+)
+
 
 class RegisterView(APIView):
     """US1-1"""
@@ -93,6 +98,7 @@ class ProfileView(APIView):
         serializer.save()
         return Response(ProfileSerializer(serializer.instance).data, status=status.HTTP_200_OK)
 
+
 class UserManagementView(APIView):
     """US8-1, US8-2"""
 
@@ -144,7 +150,9 @@ class UserStatusView(APIView):
         if was_suspended != now_suspended:
             # All items owned by a suspended user become effectively suspended.
             # Manual admin holds are not cleared by owner reactivation.
-            for equipment in Equipment.objects.filter(provider=target, admin_suspended=False).select_related("provider"):
+            for equipment in Equipment.objects.filter(provider=target, admin_suspended=False).select_related(
+                "provider"
+            ):
                 notify_equipment_change(equipment, now_suspended, reason=equipment.suspension_reason)
         if next_status == AccountStatus.SUSPENDED:
             # Database-backed sessions are configured in config/settings/base.py.

@@ -84,7 +84,9 @@ class Equipment(TimeStampedModel):
 
     @property
     def is_suspended(self):
-        return self.admin_suspended or self.provider.account_status == "SUSPENDED" or not self.provider.is_active
+        return (
+            self.admin_suspended or self.provider.account_status == "SUSPENDED" or not self.provider.is_active
+        )
 
     @property
     def suspension_reason(self):
@@ -93,7 +95,6 @@ class Equipment(TimeStampedModel):
         if self.provider.account_status == "SUSPENDED" or not self.provider.is_active:
             return "Equipment owner account is suspended."
         return ""
-
 
     objects = EquipmentQuerySet.as_manager()
 
@@ -105,11 +106,17 @@ class Equipment(TimeStampedModel):
 
 
 class EquipmentSuspensionNotice(models.Model):
-    """An in-app notice to an owner or affected borrower (no email required)."""
-    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="equipment_notices")
+    """An in-app notice to an owner or affected borrower."""
+
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="equipment_notices"
+    )
     equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, related_name="suspension_notices")
     message = models.CharField(max_length=500)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Notice for {self.recipient} ({self.equipment})"

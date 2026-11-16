@@ -114,6 +114,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     def validate_department(self, value):
         return value.strip()
 
+
 class UserRoleUpdateSerializer(serializers.ModelSerializer):
     """Restrict admin user management to capability flags only."""
 

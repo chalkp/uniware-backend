@@ -31,7 +31,8 @@ def order_requests_for_filter(queryset, requested_status):
     """
     date_field = (
         "due_date"
-        if requested_status in (
+        if requested_status
+        in (
             BorrowRequest.StatusChoices.CHECKED_OUT,
             BorrowRequest.StatusChoices.RETURNED,
         )
@@ -77,13 +78,14 @@ class BorrowRequestViewSet(
         queryset = BorrowRequest.objects.filter(borrower=self.request.user)
         if self.action == "checkout":
             queryset = queryset.select_for_update(of=("self",))
-        return (
-            queryset
-            .select_related(
-                "borrower", "equipment", "equipment__provider", "equipment__category", "equipment__location", "decided_by"
-            )
-            .order_by("-pickup_date")
-        )
+        return queryset.select_related(
+            "borrower",
+            "equipment",
+            "equipment__provider",
+            "equipment__category",
+            "equipment__location",
+            "decided_by",
+        ).order_by("-pickup_date")
 
     def perform_create(self, serializer):
         equipment = serializer.validated_data["equipment"]
@@ -153,9 +155,15 @@ class BorrowRequestViewSet(
         if borrow_request.status != BorrowRequest.StatusChoices.APPROVED:
             raise InvalidStateTransition("Only approved requests can be checked out.")
         if borrow_request.pickup_date < timezone.localdate():
-            raise InvalidStateTransition("The pickup date has passed. Arrange a new request with updated dates.")
+            raise InvalidStateTransition(
+                "The pickup date has passed. Arrange a new request with updated dates."
+            )
 
-        equipment = Equipment.objects.select_related("provider").select_for_update().get(pk=borrow_request.equipment_id)
+        equipment = (
+            Equipment.objects.select_related("provider")
+            .select_for_update()
+            .get(pk=borrow_request.equipment_id)
+        )
         if equipment.is_suspended:
             raise InvalidStateTransition("Suspended equipment cannot be checked out.")
         if equipment.status not in (EquipmentStatus.AVAILABLE, EquipmentStatus.RESERVED):
@@ -196,7 +204,12 @@ class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMi
 
     def get_queryset(self):
         queryset = BorrowRequest.objects.filter(equipment__provider=self.request.user).select_related(
-            "borrower", "equipment", "equipment__provider", "equipment__category", "equipment__location", "decided_by"
+            "borrower",
+            "equipment",
+            "equipment__provider",
+            "equipment__category",
+            "equipment__location",
+            "decided_by",
         )
         if self.action in ("approve", "reject", "mark_returned"):
             queryset = queryset.select_for_update(of=("self",))
@@ -230,7 +243,11 @@ class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMi
         if borrower.account_status == AccountStatus.SUSPENDED or not borrower.is_active:
             raise InvalidStateTransition("Suspended borrowers cannot have requests approved.")
 
-        equipment = Equipment.objects.select_related("provider").select_for_update().get(pk=borrow_request.equipment_id)
+        equipment = (
+            Equipment.objects.select_related("provider")
+            .select_for_update()
+            .get(pk=borrow_request.equipment_id)
+        )
         if equipment.is_suspended:
             raise InvalidStateTransition("Suspended equipment cannot have new approvals.")
         if equipment.status != EquipmentStatus.AVAILABLE or not check_equipment_availability(
@@ -261,7 +278,6 @@ class ProviderBorrowRequestViewSet(mixins.ListModelMixin, mixins.RetrieveModelMi
         borrow_request.decided_at = timezone.now()
         borrow_request.save(update_fields=["status", "decision_reason", "decided_by", "decided_at"])
         return Response(self.get_serializer(borrow_request).data)
-
 
     @extend_schema(summary="Record returned equipment and its condition")
     @action(detail=True, methods=["post"], url_path="return")

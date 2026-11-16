@@ -86,7 +86,17 @@ class EquipmentSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "provider", "owner", "is_suspended", "suspension_reason", "archived_at", "disabled_at", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "provider",
+            "owner",
+            "is_suspended",
+            "suspension_reason",
+            "archived_at",
+            "disabled_at",
+            "created_at",
+            "updated_at",
+        ]
 
 
 class EquipmentSuspensionUpdateSerializer(serializers.Serializer):
