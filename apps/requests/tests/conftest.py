@@ -2,6 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
+from apps.accounts.factories import DEFAULT_PASSWORD
 from apps.equipment.models import Category, Equipment, Location
 
 User = get_user_model()
@@ -15,7 +16,7 @@ def api_client():
 @pytest.fixture
 def borrower():
     """Create a standard borrower user."""
-    return User.objects.create_user(email="borrower@chula.ac.th", password="password123", is_borrower=True)
+    return User.objects.create_user(email="borrower@chula.ac.th", password=DEFAULT_PASSWORD, is_borrower=True)
 
 
 @pytest.fixture

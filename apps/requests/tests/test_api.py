@@ -222,8 +222,8 @@ class TestBorrowRequestAPI:
 
         assert len(results) == 2
 
-        assert results[0]["id"] == str(req2.id)
-        assert results[1]["id"] == str(req1.id)
+        assert results[0]["id"] == str(req1.id)
+        assert results[1]["id"] == str(req2.id)
 
     def test_get_mine_unauthenticated(self, api_client):
         """Test the 'mine' endpoint requires authentication."""

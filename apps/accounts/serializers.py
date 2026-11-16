@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
 
-from .models import ConsentRecord, User
+from .models import AccountStatus, ConsentRecord, User
 from .validators import validate_person_name, validate_university_email
 
 
@@ -176,3 +176,31 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     def validate_department(self, value):
         return value.strip()
+
+
+class UserRoleUpdateSerializer(serializers.ModelSerializer):
+    """Restrict admin user management to capability flags only."""
+
+    class Meta:
+        model = User
+        fields = ["is_admin", "is_provider", "is_borrower"]
+
+    def validate(self, attrs):
+        if not any(key in attrs for key in self.fields):
+            raise serializers.ValidationError("At least one role must be supplied.")
+        return attrs
+
+
+class UserStatusUpdateSerializer(serializers.ModelSerializer):
+    """Administrator-only status change. Roles and personal information are not editable here."""
+
+    account_status = serializers.ChoiceField(choices=AccountStatus.choices)
+
+    class Meta:
+        model = User
+        fields = ["account_status"]
+
+    def to_internal_value(self, data):
+        if not isinstance(data, Mapping) or set(data.keys()) != {"account_status"}:
+            raise serializers.ValidationError({"account_status": "Supply only the account_status field."})
+        return super().to_internal_value(data)
