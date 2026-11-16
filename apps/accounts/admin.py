@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import User
+from .models import ConsentRecord, User
 
 
 @admin.register(User)
@@ -40,3 +40,27 @@ class UserAdmin(DjangoUserAdmin):
         ),
     )
     readonly_fields = ["date_joined"]
+
+
+@admin.register(ConsentRecord)
+class ConsentRecordAdmin(admin.ModelAdmin):
+    list_display = ["user", "consent_version", "granted_at", "ip_address"]
+    search_fields = ["user__email", "consent_version", "consent_text_hash"]
+    readonly_fields = [
+        "id",
+        "user",
+        "consent_version",
+        "consent_text_hash",
+        "granted_at",
+        "ip_address",
+        "user_agent",
+    ]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

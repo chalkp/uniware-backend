@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
@@ -71,3 +72,29 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+
+class ConsentRecord(models.Model):
+    CURRENT_VERSION = "1.0"
+    CURRENT_CONSENT_TEXT = (
+        "I explicitly consent to the storage and processing of my personal data "
+        "(name, university email, and department) for UniWare equipment borrowing."
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="consent_records")
+    consent_version = models.CharField(max_length=32)
+    consent_text_hash = models.CharField(max_length=64)
+    granted_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-granted_at"]
+
+    def __str__(self):
+        return f"{self.user.email} ({self.consent_version})"
+
+    @classmethod
+    def current_text_hash(cls) -> str:
+        return hashlib.sha256(cls.CURRENT_CONSENT_TEXT.encode("utf-8")).hexdigest()
