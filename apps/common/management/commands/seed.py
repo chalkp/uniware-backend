@@ -4,10 +4,12 @@ Populate the database
 
 from datetime import date
 
-from django.core.management.base import BaseCommand
-from django.db import transaction
+from django.conf import settings
+from django.core.files import File
+from django.core.management.base import BaseCommand, CommandError
 
 from apps.accounts.models import User
+from apps.common.photos import photo_atomic, process_photo, save_photo
 from apps.equipment.models import Category, Equipment, EquipmentStatus, Location
 from apps.requests.models import BorrowRequest
 
@@ -68,7 +70,7 @@ EQUIPMENT_NAMES = [
 class Command(BaseCommand):
     help = "Idempotent demo data for the current backend scope (accounts + equipment + requests)."
 
-    @transaction.atomic
+    @photo_atomic
     def handle(self, *args, **options):
         admin = self._get_or_create_user(
             "admin@chula.ac.th", "Admin", "User", is_admin=True, is_staff=True, is_superuser=True
@@ -107,6 +109,7 @@ class Command(BaseCommand):
                     "status": EquipmentStatus.AVAILABLE,
                 },
             )
+            self._seed_photos(equipment)
             action = "created" if created else "already present"
             self.stdout.write(f"equipment: {asset_id} ({name}) — {action}")
 
@@ -162,6 +165,26 @@ class Command(BaseCommand):
         )
 
         self.stdout.write(self.style.SUCCESS("Seed complete."))
+
+    def _seed_photos(self, equipment):
+        directory = settings.BASE_DIR / "seed_assets" / "equipment"
+        for slot in (1, 2, 3):
+            prefix = "photo" if slot == 1 else f"photo_{slot}"
+            if getattr(equipment, f"{prefix}_original"):
+                continue
+            matches = [path for path in directory.glob(f"{equipment.asset_id}-{slot}.*")
+                       if path.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")]
+            if len(matches) > 1:
+                raise CommandError(f"Multiple seed photos for {equipment.asset_id} slot {slot}.")
+            if matches:
+                path = matches[0]
+                try:
+                    with path.open("rb") as source:
+                        photo = File(source, name=path.name)
+                        save_photo(equipment, process_photo(photo), slot)
+                except Exception as exc:
+                    raise CommandError(f"Unable to import seed photo {path.name}: {exc}") from exc
+                self.stdout.write(f"equipment photo: {path.name} — imported")
 
     @staticmethod
     def _get_or_create_user(email, first_name, last_name, **flags):
