@@ -50,3 +50,14 @@ class BorrowRequest(models.Model):
 
     def __str__(self):
         return f"Request {self.id} - {self.status}"
+
+
+class Checkout(models.Model):
+    """Immutable handover audit; lifecycle/return state remains on the request."""
+
+    request = models.OneToOneField(BorrowRequest, on_delete=models.PROTECT, related_name="checkout_record")
+    checkout_at = models.DateTimeField(auto_now_add=True, editable=False)
+    handover_person = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, editable=False)
+
+    def __str__(self):
+        return f"Handover for {self.request_id}"

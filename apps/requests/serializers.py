@@ -6,7 +6,7 @@ from rest_framework import serializers
 from apps.equipment.models import Equipment, EquipmentStatus
 from apps.equipment.serializers import EquipmentSerializer
 
-from .models import BorrowRequest
+from .models import BorrowRequest, Checkout
 from .services import check_equipment_availability
 
 User = get_user_model()
@@ -34,7 +34,25 @@ class RejectionReasonSerializer(serializers.Serializer):
     reason = serializers.CharField(max_length=2000, allow_blank=False, trim_whitespace=True)
 
 
+class CheckoutSerializer(serializers.ModelSerializer):
+    handover_person = BorrowerSummarySerializer(read_only=True)
+
+    class Meta:
+        model = Checkout
+        fields = ["checkout_at", "handover_person"]
+        read_only_fields = fields
+
+
 class BorrowRequestSerializer(serializers.ModelSerializer):
+    checkout_record = CheckoutSerializer(read_only=True)
+
+    def to_internal_value(self, data):
+        if any(field in data for field in ("checkout_record", "checkout_at", "handover_person")):
+            raise serializers.ValidationError(
+                {"checkout_record": "Handover records cannot be supplied or modified."}
+            )
+        return super().to_internal_value(data)
+
     equipment = EquipmentSerializer(read_only=True)
     equipment_id = serializers.PrimaryKeyRelatedField(
         source="equipment",
@@ -49,6 +67,7 @@ class BorrowRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = BorrowRequest
         fields = [
+            "checkout_record",
             "id",
             "borrower",
             "equipment",
@@ -136,6 +155,7 @@ class BorrowRequestSerializer(serializers.ModelSerializer):
 
 
 class ProviderBorrowRequestSerializer(serializers.ModelSerializer):
+    checkout_record = CheckoutSerializer(read_only=True)
     borrower = BorrowerSummarySerializer(read_only=True)
     equipment = EquipmentSerializer(read_only=True)
     decided_by = serializers.PrimaryKeyRelatedField(read_only=True)
@@ -143,6 +163,7 @@ class ProviderBorrowRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = BorrowRequest
         fields = [
+            "checkout_record",
             "id",
             "borrower",
             "equipment",
